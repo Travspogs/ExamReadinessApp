@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Dimensions, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { StorageService } from "../utils/storageService"; // DINAGDAG
+import { StorageService } from "../utils/storageService";
 
 const { width } = Dimensions.get("window");
 
@@ -10,7 +10,7 @@ export default function InsightsScreen({ navigation }) {
   
   const [stats, setStats] = useState({
     strength: "NONE",
-    weakness: "NONE",
+    weakness: "MORE DATA REQ.",
     accuracy: "0%",
     totalTries: "0",
     rank: "UNRANKED"
@@ -18,25 +18,25 @@ export default function InsightsScreen({ navigation }) {
 
   const loadAndAnalyze = async () => {
     try {
-      // PINALITAN: Gagamit na tayo ng StorageService para sa updated results
       const logs = await StorageService.getResults(); 
       
+      // 1. HARD CHECK KUNG EMPTY ANG LOGS PARA HINDI MAG-DEFAULT SA MATH
       if (!logs || logs.length === 0) {
         setStats({
-            strength: "N/A",
-            weakness: "N/A",
+            strength: "NONE",
+            weakness: "MORE DATA REQ.",
             accuracy: "0%",
             totalTries: "0",
             rank: "UNRANKED"
         });
-        return "Initial Data Insufficient. Please complete more challenges to generate a neural profile.";
+        return "Initial Data Insufficient. Please complete more challenges to generate a neural profile. System requires at least one completed session to begin analysis.";
       }
 
-      // 2. Group by subject para makuha ang average per category (Filipino, Math, etc.)
+      // 2. Group by subject
       const grouped = logs.reduce((acc, log) => {
         const subName = log.subject || "Unknown";
         acc[subName] = acc[subName] || { totalScore: 0, count: 0 };
-        acc[subName].totalScore += log.score; // Inayos mula percentage -> score
+        acc[subName].totalScore += log.score; 
         acc[subName].count += 1;
         return acc;
       }, {});
@@ -68,7 +68,7 @@ export default function InsightsScreen({ navigation }) {
 
     } catch (e) {
       console.log(e);
-      return "Error accessing neural data.";
+      return "Error accessing neural data. Protocol failure.";
     }
   };
 
@@ -100,7 +100,6 @@ export default function InsightsScreen({ navigation }) {
           
           <View style={styles.header}>
             <TouchableOpacity onPress={() => navigation.goBack()}>
-              {/* Back Button remains consistent */}
               <Text style={styles.backBtn}>◄ BACK</Text>
             </TouchableOpacity>
             <Text style={styles.title}>MY<Text style={{color: '#6366f1'}}>INSIGHTS</Text></Text>

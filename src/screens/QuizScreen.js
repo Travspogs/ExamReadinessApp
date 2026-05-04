@@ -18,10 +18,15 @@ export default function QuizScreen({ route, navigation }) {
   const [loading, setLoading] = useState(true);
   const [quizSet, setQuizSet] = useState([]);
   const [userAnswers, setUserAnswers] = useState({}); 
+  const [isSaving, setIsSaving] = useState(false); // Iwas double-save
 
   useEffect(() => {
     if (subject && difficulty && questions[subject] && questions[subject][difficulty]) {
-      setQuizSet(questions[subject][difficulty]);
+      const allQuestionsPool = questions[subject][difficulty];
+      const shuffled = [...allQuestionsPool].sort(() => Math.random() - 0.5);
+      const selectedTen = shuffled.slice(0, 10);
+      
+      setQuizSet(selectedTen);
       setLoading(false);
     } else {
       setLoading(false);
@@ -51,22 +56,24 @@ export default function QuizScreen({ route, navigation }) {
     }
   };
 
-  
   const sanitize = (str) => {
+    if (!str) return "";
     return str.toString()
       .toLowerCase()
-      .replace(/[-_]/g, '') 
-      .replace(/\s+/g, ''); 
+      .trim()
+      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "") 
+      .replace(/\s+/g, ""); 
   };
 
   const calculateFinalResults = async () => {
+    if (isSaving) return; // Proteksyon sa double submission
+    setIsSaving(true);
+
     let finalScoreCount = 0;
     let wrongAnswersList = [];
 
     quizSet.forEach((q, index) => {
       const uAns = userAnswers[index] || "";
-      
-      
       const isCorrect = sanitize(uAns) === sanitize(q.answer);
       
       if (isCorrect) {
@@ -79,12 +86,17 @@ export default function QuizScreen({ route, navigation }) {
     const scorePercentage = (finalScoreCount / quizSet.length) * 100;
 
     try {
-      await StorageService.saveQuizResult({
+      // Sinisigurado na unique ang pag-save base sa email/contact na nilagay natin sa Login
+      const saveStatus = await StorageService.saveQuizResult({
         subject: subject,
         difficulty: difficulty,
         score: scorePercentage,
         date: new Date().toISOString(), 
       });
+
+      if (!saveStatus) {
+        console.warn("Storage warning: Result saved but may have issues with unique key.");
+      }
     } catch (error) {
       console.log("Error saving results:", error);
     }
@@ -98,7 +110,14 @@ export default function QuizScreen({ route, navigation }) {
     });
   };
 
-  if (loading) return <View style={styles.center}><ActivityIndicator color="#6366f1" size="large" /></View>;
+  if (loading || isSaving) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator color="#6366f1" size="large" />
+        {isSaving && <Text style={{color: '#fff', marginTop: 10}}>SYNCING RESULTS...</Text>}
+      </View>
+    );
+  }
 
   if (quizSet.length === 0) {
     return (
@@ -117,14 +136,12 @@ export default function QuizScreen({ route, navigation }) {
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
-        
         <View style={styles.header}>
           <Text style={styles.nodeText}>SUBJECT : {subject?.toUpperCase()} EXAM</Text>
           <Text style={styles.progressText}>{currentIdx + 1}/{quizSet.length}</Text>
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          
           <View style={styles.titleSection}>
             <Text style={styles.subTag}>Reminder:</Text>
             <Text style={styles.mainTitle}>FOCUS AND{'\n'}GOODLUCK</Text>
@@ -132,11 +149,9 @@ export default function QuizScreen({ route, navigation }) {
 
           <View style={styles.boardContainer}>
             <View style={styles.accordionBoard}>
-              
               <View style={styles.boardHeader}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.nodeId}>Reminder! {currentQ?.type}</Text>
-                  {}
                   <Text style={styles.caseHint}>(Case Insensitive / Symbols Ignored)</Text>
                   <Text style={styles.questionText}>{currentQ?.question}</Text>
                 </View>
@@ -198,16 +213,15 @@ export default function QuizScreen({ route, navigation }) {
                 </TouchableOpacity>
               </View>
             </View>
-            
             <View style={styles.boardShadow} />
           </View>
-
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
+// *** GAMITIN ANG IYONG EXISTING STYLES SA BABA ***
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#02040d" },
   center: { flex: 1, backgroundColor: "#02040d", justifyContent: 'center', alignItems: 'center' },
@@ -222,7 +236,7 @@ const styles = StyleSheet.create({
   accordionBoard: { width: '100%', maxWidth: 500, backgroundColor: "#0b0c14", borderRadius: 24, borderWidth: 1, borderColor: "#6366f130", overflow: 'hidden' },
   boardHeader: { padding: 24, borderBottomWidth: 1, borderBottomColor: "#1a1b26" },
   nodeId: { color: "#a855f7", fontSize: 9, fontWeight: "900", marginBottom: 2 },
-  caseHint: { color: "#475569", fontSize: 8, fontWeight: "700", marginBottom: 8, letterSpacing: 0.5 }, // NEW STYLE
+  caseHint: { color: "#475569", fontSize: 8, fontWeight: "700", marginBottom: 8, letterSpacing: 0.5 },
   questionText: { color: "#fff", fontSize: 18, fontWeight: "800", lineHeight: 24 },
   boardBody: { padding: 20 },
   instructText: { fontSize: 10, color: "#475569", marginBottom: 15, fontWeight: '800', letterSpacing: 1 },

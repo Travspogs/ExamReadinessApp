@@ -22,7 +22,7 @@ export default function SignUpScreen({ navigation }) {
   const [showPassword, setShowPassword] = useState(false);
 
   const handleSignUp = async () => {
-    // 1. FULL NAME CHECK (REQUIRED)
+    // 1. FULL NAME CHECK
     if (!fullName || fullName.trim().length === 0) {
       return Alert.alert(
         "VALIDATION_ERROR", 
@@ -45,16 +45,7 @@ export default function SignUpScreen({ navigation }) {
           "UNAUTHORIZED_EMAIL: Access restricted to @hcdc.edu.ph domain only."
         );
       }
-
-      const hcdcRegex = /^[a-z]+\.[a-z]+@hcdc\.edu\.ph$/;
-      if (!hcdcRegex.test(trimmedContact)) {
-        return Alert.alert(
-          "INVALID_FORMAT",
-          "PROTOCOL_ERROR: Identity must follow 'firstname.lastname@hcdc.edu.ph'."
-        );
-      }
     } else {
-      // Mobile validation
       const phoneRegex = /^09[0-9]{9}$/;
       if (!phoneRegex.test(trimmedContact)) {
         return Alert.alert("PROTOCOL_ERROR", "INVALID NUMBER: Use 11-digit mobile starting with 09.");
@@ -66,7 +57,7 @@ export default function SignUpScreen({ navigation }) {
     if (password.length < 8 || !symbolRegex.test(password)) {
       return Alert.alert(
         "WEAK_SECURITY",
-        "REGISTRATION FAILED: Password must be 8+ characters with at least one special character (!@#$)."
+        "REGISTRATION FAILED: Password must be 8+ characters with at least one symbol."
       );
     }
 
@@ -75,11 +66,9 @@ export default function SignUpScreen({ navigation }) {
       const result = await registerUser(trimmedContact, password, fullName.trim());
       
       if (result.success === false) {
-        // THIS SHOWS THE "ACCOUNT ALREADY EXISTS" MESSAGE
         return Alert.alert("DATABASE_CONFLICT", result.message);
       }
 
-      // SUCCESS
       Alert.alert("IDENTITY_CREATED", "System access granted. You can now login.");
       navigation.replace("Login"); 
       
@@ -111,7 +100,12 @@ export default function SignUpScreen({ navigation }) {
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Full Name</Text>
-              <TextInput placeholder="Juan Dela Cruz" onChangeText={setFullName} style={styles.input} placeholderTextColor="#475569" />
+              <TextInput 
+                placeholder="Juan Dela Cruz" 
+                onChangeText={setFullName} 
+                style={styles.input} 
+                placeholderTextColor="#475569" 
+              />
             </View>
 
             <View style={styles.inputContainer}>
@@ -126,9 +120,6 @@ export default function SignUpScreen({ navigation }) {
                 placeholderTextColor="#475569" 
                 autoCapitalize="none" 
               />
-              {contact.includes("@") && !contact.toLowerCase().endsWith("@hcdc.edu.ph") && (
-                <Text style={styles.warningText}>REQUIRED: Use @hcdc.edu.ph domain</Text>
-              )}
             </View>
 
             <View style={styles.inputContainer}>
@@ -162,7 +153,6 @@ export default function SignUpScreen({ navigation }) {
   );
 }
 
-// ... styles remain the same
 const styles = StyleSheet.create({
   container: { flexDirection: "row", flexGrow: 1, backgroundColor: "#020512" },
   left: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#0B0F19" },
@@ -184,7 +174,7 @@ const styles = StyleSheet.create({
   linkContainer: { marginTop: 30, alignItems: "center" },
   linkBase: { color: "#475569", fontSize: 12 },
   linkHighlight: { color: "#a855f7", fontWeight: "900", textDecorationLine: 'underline' },
-  aiImage: { width: 280, height: 280, resizeMode: "contain" },
+  aiImage: { width: 600, height: 600, resizeMode: "contain" },
   glow1: { position: "absolute", width: 300, height: 300, backgroundColor: "#a855f7", borderRadius: 150, opacity: 0.05, top: -50, left: -50 },
   glow2: { position: "absolute", width: 300, height: 300, backgroundColor: "#6366f1", borderRadius: 150, opacity: 0.05, bottom: -100, right: -50 },
   floatingInfo: { position: "absolute", bottom: 40, backgroundColor: "rgba(11, 15, 25, 0.8)", paddingHorizontal: 15, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" },

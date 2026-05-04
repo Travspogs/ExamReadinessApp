@@ -1,9 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+// Gagamit tayo ng iisang KEY para sa lahat ng screens
+const USERS_KEY = "registered_users";
+const SESSION_KEY = "current_user";
+
 // --- REGISTER USER ---
 export const registerUser = async (contact, password, fullName) => {
   try {
-    // 1. REQUIRE FULL NAME CHECK
     if (!fullName || fullName.trim().length === 0) {
       return { 
         success: false, 
@@ -13,7 +16,7 @@ export const registerUser = async (contact, password, fullName) => {
 
     const trimmedContact = contact.toLowerCase().trim();
 
-    // 2. FLEXIBLE CONTACT CHECK (Email or Phone)
+    // FLEXIBLE CONTACT CHECK
     const isEmail = trimmedContact.includes("@");
     if (isEmail) {
       if (!trimmedContact.endsWith("@hcdc.edu.ph")) {
@@ -23,7 +26,6 @@ export const registerUser = async (contact, password, fullName) => {
         };
       }
     } else {
-      // Basic check kung valid phone format (09...)
       const phoneRegex = /^09[0-9]{9}$/;
       if (!phoneRegex.test(trimmedContact)) {
         return { 
@@ -33,26 +35,27 @@ export const registerUser = async (contact, password, fullName) => {
       }
     }
 
-    const existingData = await AsyncStorage.getItem("users_list");
+    const existingData = await AsyncStorage.getItem(USERS_KEY);
     let users = existingData ? JSON.parse(existingData) : [];
 
-    // 3. IDENTITY CONFLICT CHECK
-    if (users.find(u => u.contact === trimmedContact)) {
+    // IDENTITY CONFLICT CHECK
+    if (users.find(u => (u.email === trimmedContact) || (u.contact === trimmedContact))) {
       return { 
         success: false, 
         message: "IDENTITY_CONFLICT: This contact is already registered." 
       };
     }
 
-    // 4. SAVE IDENTITY (Mahalaga ang 'contact' field para sa StorageService)
+    // SAVE IDENTITY
     const newUser = { 
-      contact: trimmedContact, 
+      contact: trimmedContact,
+      email: isEmail ? trimmedContact : "", 
       password: password, 
       fullName: fullName.trim() 
     };
 
     users.push(newUser);
-    await AsyncStorage.setItem("users_list", JSON.stringify(users));
+    await AsyncStorage.setItem(USERS_KEY, JSON.stringify(users));
     
     console.log("REGISTRATION_SUCCESS:", trimmedContact);
     return { success: true };
@@ -65,32 +68,35 @@ export const registerUser = async (contact, password, fullName) => {
 export const loginUser = async (contact, password) => {
   try {
     const trimmedContact = contact.toLowerCase().trim();
-
-    const data = await AsyncStorage.getItem("users_list");
-    if (!data) return false;
+    const data = await AsyncStorage.getItem(USERS_KEY);
+    
+    if (!data) return null;
 
     const users = JSON.parse(data);
     
-    // Hahanapin yung user na match ang contact (email/phone) at password
-    const user = users.find(u => u.contact === trimmedContact && u.password === password);
+    // Hahanapin yung user (check email field OR contact field)
+    const user = users.find(u => 
+      (u.contact === trimmedContact || u.email === trimmedContact) && 
+      u.password === password
+    );
 
     if (user) {
-      // Isave ang session para malaman ng app kung sino ang active user
-      await AsyncStorage.setItem("current_user", JSON.stringify(user));
-      return true;
+      // Isave ang session
+      await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(user));
+      return user; 
     }
-    return false;
+    return null; 
   } catch (error) {
     console.error("Login Error:", error);
-    return false;
+    return null;
   }
 };
 
-// --- LOGOUT USER (NEWLY ADDED) ---
+// --- LOGOUT USER ---
 export const logoutUser = async () => {
   try {
-    // Tatanggalin ang current_user para sa susunod na login, malinis ang storage
-    await AsyncStorage.removeItem("current_user");
+    await AsyncStorage.removeItem(SESSION_KEY);
+    await AsyncStorage.removeItem("userToken"); // Linisin pati yung token
     console.log("LOGOUT_SUCCESS: Session cleared.");
     return true;
   } catch (error) {
@@ -103,18 +109,18 @@ export const logoutUser = async () => {
 export const resetPassword = async (contact, newPassword) => {
   try {
     const trimmedContact = contact.toLowerCase().trim();
-    const data = await AsyncStorage.getItem("users_list");
+    const data = await AsyncStorage.getItem(USERS_KEY);
     if (!data) return { success: false, message: "User base empty." };
 
     let users = JSON.parse(data);
-    const userIndex = users.findIndex(u => u.contact === trimmedContact);
+    const userIndex = users.findIndex(u => u.contact === trimmedContact || u.email === trimmedContact);
 
     if (userIndex === -1) {
       return { success: false, message: "Contact not found." };
     }
 
     users[userIndex].password = newPassword;
-    await AsyncStorage.setItem("users_list", JSON.stringify(users));
+    await AsyncStorage.setItem(USERS_KEY, JSON.stringify(users));
     
     return { success: true, message: "Password updated!" };
   } catch (error) {
@@ -123,30 +129,26 @@ export const resetPassword = async (contact, newPassword) => {
 };
 
 // --- SOCIAL LOGIN ---
-export const socialLogin = async (email, provider) => {
+export const socialLogin = async (email, provider, name) => {
   try {
     const lowerEmail = email.toLowerCase().trim();
-    
-    if (!lowerEmail.endsWith("@hcdc.edu.ph")) {
-      return { success: false, message: "HCDC emails only." };
-    }
-
-    const existingData = await AsyncStorage.getItem("users_list");
+    const existingData = await AsyncStorage.getItem(USERS_KEY);
     let users = existingData ? JSON.parse(existingData) : [];
 
-    let user = users.find(u => u.contact === lowerEmail);
+    let user = users.find(u => u.email === lowerEmail || u.contact === lowerEmail);
 
     if (!user) {
       user = { 
-        contact: lowerEmail, 
+        contact: lowerEmail,
+        email: lowerEmail,
         password: `SOCIAL_${provider}_${Date.now()}`,
-        fullName: `User_${provider}`
+        fullName: name || `User_${provider}`
       };
       users.push(user);
-      await AsyncStorage.setItem("users_list", JSON.stringify(users));
+      await AsyncStorage.setItem(USERS_KEY, JSON.stringify(users));
     }
 
-    await AsyncStorage.setItem("current_user", JSON.stringify(user));
+    await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(user));
     return { success: true, user };
   } catch (error) {
     return { success: false };

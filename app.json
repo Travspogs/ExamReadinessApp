@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "ExamReadinessApp",
-    "slug": "ExamReadinessApp",
+    "slug": "examreadinessapp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -9,9 +9,11 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.novielheheh.examreadinessapp"
     },
     "android": {
+      "package": "com.novielheheh.examreadinessapp", 
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundColor": "#E6F4FE"

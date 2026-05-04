@@ -4,7 +4,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import AnalyticsScreen from "../screens/AnalyticsScreen";
 import HomeScreen from "../screens/HomeScreen";
 import InputScreen from "../screens/InputScreen";
-import InsightsScreen from "../screens/InsightsScreen"; // Ito ang UI na may Performance Report
+import InsightsScreen from "../screens/InsightsScreen";
 import LeaderboardScreen from "../screens/LeaderboardScreen";
 import LoginScreen from "../screens/LoginScreen";
 import QuizScreen from "../screens/QuizScreen";
@@ -14,11 +14,13 @@ import SignUpScreen from "../screens/SignUpScreen";
 
 const Stack = createNativeStackNavigator();
 
-export default function AppNavigator() {
+// 1. Idagdag ang { initialRouteName } bilang prop dito
+export default function AppNavigator({ initialRouteName }) {
   return (
     <NavigationContainer>
       <Stack.Navigator
-        initialRouteName="Login"
+        // 2. Palitan ang "Login" ng variable na initialRouteName
+        initialRouteName={initialRouteName || "Login"} 
         screenOptions={{ headerShown: false }}
       >
         <Stack.Screen name="Login" component={LoginScreen} />
@@ -29,7 +31,6 @@ export default function AppNavigator() {
         <Stack.Screen name="Result" component={ResultScreen} />
         <Stack.Screen name="Review" component={ReviewScreen} />
         
-        {/* MAGKAHIWALAY NA SILA DITO */}
         <Stack.Screen name="Insights" component={InsightsScreen} /> 
         <Stack.Screen name="Analytics" component={AnalyticsScreen} />
         

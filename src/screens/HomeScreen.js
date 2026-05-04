@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   FlatList,
   Image,
   Modal,
@@ -21,14 +22,20 @@ import {
 } from "react-native";
 import { StorageService } from "../utils/storageService";
 
+const { width } = Dimensions.get('window');
+
 export default function HomeScreen({ navigation }) {
   const [readinessText, setReadinessText] = useState("");
   const [subjectProgress, setSubjectProgress] = useState({});
   const [userName, setUserName] = useState("STUDENT");
-  const [userContact, setUserContact] = useState(""); // Binago mula userEmail
-  const [userPassword, setUserPassword] = useState(""); // Binago mula tempPassword
+  const [userEmail, setUserEmail] = useState(""); 
   const [profileImage, setProfileImage] = useState(null);
   
+  const [address, setAddress] = useState("");
+  const [birthday, setBirthday] = useState("");
+  const [gender, setGender] = useState("");
+
+  const [tempPassword, setTempPassword] = useState("");
   const [showProfile, setShowProfile] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState("");
   const [showSelector, setShowSelector] = useState(false);
@@ -50,25 +57,45 @@ export default function HomeScreen({ navigation }) {
     require('../assets/assets/avatar4.png'),
   ];
 
+  // FIXED: Pinagsama ang login data at custom saved data
   const loadUserData = async () => {
     try {
       const userData = await AsyncStorage.getItem('current_user');
       if (userData) {
         const user = JSON.parse(userData);
-        const displayName = user.fullName || user.name || user.username || "STUDENT";
-        setUserName(displayName.toUpperCase());
-        setUserContact(user.contact || user.email || "No Contact Linked");
-        setUserPassword(user.password || ""); // Naka-sync sa storage
+        const emailKey = user.email || user.contact || "default";
+        const safeId = emailKey.replace(/[@.]/g, '_');
+        setUserEmail(emailKey);
 
-        const savedImage = await AsyncStorage.getItem(`profile_image_${user.email || user.contact}`);
+        // Permanent Name Check: Mas prioritized ang custom_name na sinave sa profile
+        const savedCustomName = await AsyncStorage.getItem(`custom_name_${safeId}`);
+        const displayName = savedCustomName || user.fullName || user.fullname || user.name || user.username || "STUDENT";
+        setUserName(displayName.toUpperCase());
+
+        const savedAddr = await AsyncStorage.getItem(`address_${safeId}`);
+        const savedBday = await AsyncStorage.getItem(`birthday_${safeId}`);
+        const savedGndr = await AsyncStorage.getItem(`gender_${safeId}`);
+        
+        setAddress(savedAddr || "");
+        setBirthday(savedBday || "");
+        setGender(savedGndr || "");
+
+        // FIXED AVATAR LOADING: Iniiwasan ang black screen sa tamang pag-parse
+        const savedImage = await AsyncStorage.getItem(`profile_image_${safeId}`);
         if (savedImage) {
-          try {
+          if (savedImage.startsWith('{')) { 
+            // Kung preset avatar ito (JSON string)
             const parsed = JSON.parse(savedImage);
-            if (parsed.presetIndex !== undefined) setProfileImage(presetAvatars[parsed.presetIndex]);
-            else setProfileImage(savedImage);
-          } catch { setProfileImage(savedImage); }
+            setProfileImage(presetAvatars[parsed.presetIndex]);
+          } else {
+            // Kung gallery image ito (URI string)
+            setProfileImage(savedImage);
+          }
+        } else {
+          setProfileImage(null);
         }
       }
+
       const progress = await StorageService.getSubjectProgress();
       setSubjectProgress(progress || {});
     } catch (e) { console.log("Load Error:", e); }
@@ -86,14 +113,42 @@ export default function HomeScreen({ navigation }) {
     });
     if (!result.canceled) {
       const uri = result.assets[0].uri;
+      const safeId = userEmail.replace(/[@.]/g, '_');
       setProfileImage(uri);
-      await AsyncStorage.setItem(`profile_image_${userContact}`, uri);
+      // Sinisave as raw string para sa URI
+      await AsyncStorage.setItem(`profile_image_${safeId}`, uri);
     }
   };
 
   const selectPresetAvatar = async (index) => {
+    const safeId = userEmail.replace(/[@.]/g, '_');
     setProfileImage(presetAvatars[index]);
-    await AsyncStorage.setItem(`profile_image_${userContact}`, JSON.stringify({ presetIndex: index }));
+    // Sinisave as JSON string para malaman ng loader na preset ito
+    await AsyncStorage.setItem(`profile_image_${safeId}`, JSON.stringify({ presetIndex: index }));
+  };
+
+  // FIXED: Sinasave na ang custom name para permanent na siya
+  const handleSaveProfile = async () => {
+    try {
+        const safeId = userEmail.replace(/[@.]/g, '_');
+        await AsyncStorage.setItem(`custom_name_${safeId}`, userName);
+        await AsyncStorage.setItem(`address_${safeId}`, address);
+        await AsyncStorage.setItem(`birthday_${safeId}`, birthday);
+        await AsyncStorage.setItem(`gender_${safeId}`, gender);
+
+        // I-update din ang session storage para siguradong sync
+        const userData = await AsyncStorage.getItem('current_user');
+        if (userData) {
+          let user = JSON.parse(userData);
+          user.fullName = userName;
+          await AsyncStorage.setItem('current_user', JSON.stringify(user));
+        }
+
+        Alert.alert("SYSTEM UPDATE", "Profile credentials synchronized successfully.");
+        setShowProfile(false);
+    } catch (e) {
+        Alert.alert("SAVE ERROR", "Failed to update profile data.");
+    }
   };
 
   const openDifficultySelector = (subject) => {
@@ -104,7 +159,6 @@ export default function HomeScreen({ navigation }) {
   const processNavigation = (diff) => {
     setShowSelector(false);
     setIsSystemLoading(true);
-    
     setTimeout(() => {
       setIsSystemLoading(false);
       navigation.navigate("Quiz", { subject: selectedSubject, difficulty: diff });
@@ -115,11 +169,6 @@ export default function HomeScreen({ navigation }) {
     AsyncStorage.removeItem('current_user').then(() => {
       navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
     });
-  };
-
-  const handleSaveProfile = () => {
-    Alert.alert("SYSTEM UPDATE", "Profile credentials synchronized successfully.");
-    setShowProfile(false);
   };
 
   const getDiffTheme = (level) => {
@@ -136,7 +185,7 @@ export default function HomeScreen({ navigation }) {
     return subject ? subject.color : "#6366f1";
   };
 
-  useFocusEffect(useCallback(() => { loadUserData(); }, [userContact]));
+  useFocusEffect(useCallback(() => { loadUserData(); }, [userEmail]));
 
   useEffect(() => {
     let index = 0;
@@ -150,25 +199,26 @@ export default function HomeScreen({ navigation }) {
     return () => clearInterval(interval);
   }, [userName]);
 
+  // FIXED: Safe rendering ng avatar images
   const RenderAvatar = ({ size = 'large' }) => {
     let avatarStyle = styles.avatarCircleLarge;
     let textStyle = styles.avatarLetterLarge;
 
     if (size === 'small') {
-      avatarStyle = styles.miniAvatar;
-      textStyle = styles.miniAvatarText;
+      avatarStyle = styles.dashboardAvatar;
+      textStyle = styles.dashboardAvatarText;
     } else if (size === 'extraLarge') {
       avatarStyle = styles.avatarCircleExtraLarge;
       textStyle = styles.avatarLetterExtraLarge;
     }
 
     if (profileImage) {
-      const source = typeof profileImage === 'string' ? { uri: profileImage } : profileImage;
-      return <Image source={source} style={avatarStyle} />;
+      const source = typeof profileImage === 'number' ? profileImage : { uri: profileImage };
+      return <Image source={source} style={avatarStyle} key={profileImage.toString()} />;
     }
     return (
       <View style={[avatarStyle, { backgroundColor: 'rgba(99, 102, 241, 0.1)' }]}>
-        <Text style={textStyle}>{userName.charAt(0)}</Text>
+        <Text style={textStyle}>{userName ? userName.charAt(0) : 'S'}</Text>
       </View>
     );
   };
@@ -186,10 +236,9 @@ export default function HomeScreen({ navigation }) {
         </View>
       )}
 
-      {/* PROFILE MODAL - BINAGO ANG INPUTS DITO */}
       <Modal transparent visible={showProfile} animationType="slide">
         <View style={styles.modalContainer}>
-          <View style={[styles.modalContent, { height: '85%', paddingBottom: 20 }]}>
+          <View style={[styles.modalContent, { height: '88%', paddingBottom: 20 }]}>
             <Text style={styles.modalTitle}>ACCOUNT SETTINGS</Text>
             
             <TouchableOpacity onPress={pickImage} style={styles.mainAvatarContainerLarge}>
@@ -199,42 +248,31 @@ export default function HomeScreen({ navigation }) {
 
             <ScrollView style={{ width: '100%' }} showsVerticalScrollIndicator={false}>
               <View style={styles.settingsGroup}>
-                <Text style={styles.settingLabel}>USER INFORMATION</Text>
+                <Text style={styles.settingLabel}>PERSONAL DATA</Text>
                 
                 <View style={styles.inputWrapper}>
                   <Text style={styles.inputLabel}>FULL NAME</Text>
-                  <TextInput 
-                    style={styles.profileInput} 
-                    value={userName} 
-                    onChangeText={(val) => setUserName(val.toUpperCase())}
-                    placeholder="Enter Name"
-                    placeholderTextColor="rgba(255,255,255,0.2)"
-                  />
+                  <TextInput style={styles.profileInput} value={userName} onChangeText={(val) => setUserName(val.toUpperCase())} placeholderTextColor="rgba(255,255,255,0.2)"/>
                 </View>
 
-                {/* PINALITANG FIELD: CONTACT NUMBER / USERNAME */}
                 <View style={styles.inputWrapper}>
-                  <Text style={styles.inputLabel}>IDENTIFICATION (EMAIL/MOBILE)</Text>
-                  <TextInput 
-                    style={styles.profileInput} 
-                    value={userContact} 
-                    onChangeText={setUserContact}
-                    placeholder="User ID or Contact"
-                    placeholderTextColor="rgba(255,255,255,0.2)"
-                  />
+                  <Text style={styles.inputLabel}>RESIDENTIAL ADDRESS 🇵🇭</Text>
+                  <TextInput style={styles.profileInput} value={address} onChangeText={setAddress} placeholder="City, Province" placeholderTextColor="rgba(255,255,255,0.2)"/>
                 </View>
 
-                {/* PINALITANG FIELD: PASSWORD */}
                 <View style={styles.inputWrapper}>
-                  <Text style={styles.inputLabel}>SECURITY KEY (PASSWORD)</Text>
-                  <TextInput 
-                    style={styles.profileInput} 
-                    value={userPassword}
-                    onChangeText={setUserPassword}
-                    placeholder="••••••••"
-                    secureTextEntry
-                    placeholderTextColor="rgba(255,255,255,0.2)"
-                  />
+                  <Text style={styles.inputLabel}>BIRTHDAY</Text>
+                  <TextInput style={styles.profileInput} value={birthday} onChangeText={setBirthday} placeholder="MM/DD/YYYY" placeholderTextColor="rgba(255,255,255,0.2)"/>
+                </View>
+
+                <View style={styles.inputWrapper}>
+                  <Text style={styles.inputLabel}>GENDER</Text>
+                  <TextInput style={styles.profileInput} value={gender} onChangeText={setGender} placeholder="Enter Gender" placeholderTextColor="rgba(255,255,255,0.2)"/>
+                </View>
+
+                <View style={styles.inputWrapper}>
+                  <Text style={styles.inputLabel}>PASSWORD</Text>
+                  <TextInput style={styles.profileInput} value={tempPassword} onChangeText={setTempPassword} placeholder="••••••••" secureTextEntry placeholderTextColor="rgba(255,255,255,0.2)"/>
                 </View>
 
                 <Text style={[styles.settingLabel, { marginTop: 15 }]}>PRESET AVATARS</Text>
@@ -265,7 +303,6 @@ export default function HomeScreen({ navigation }) {
         </View>
       </Modal>
 
-      {/* DIFFICULTY MODAL - NO CHANGES */}
       <Modal transparent visible={showSelector} animationType="fade">
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
@@ -274,25 +311,18 @@ export default function HomeScreen({ navigation }) {
                 <View style={styles.titleDivider} />
                 <Text style={styles.modalSub}>{selectedSubject.toUpperCase()}</Text>
             </View>
-            <View style={styles.levelGroup}>
+            <div style={styles.levelGroup}>
                 {["EASY", "MEDIUM", "HARD"].map((level) => {
                     const theme = getDiffTheme(level);
                     return (
-                        <TouchableOpacity 
-                            key={level} 
-                            style={[styles.levelBtn, { borderColor: theme.color + '40', backgroundColor: theme.bg }]} 
-                            onPress={() => processNavigation(level)}
-                        >
+                        <TouchableOpacity key={level} style={[styles.levelBtn, { borderColor: theme.color + '40', backgroundColor: theme.bg }]} onPress={() => processNavigation(level)}>
                             <View style={[styles.statusDot, { backgroundColor: theme.color }]} />
                             <Text style={[styles.levelBtnText, { color: theme.color }]}>{level}</Text>
-                            <Text style={{color: theme.color, fontSize: 10, opacity: 0.5}}>▶</Text>
                         </TouchableOpacity>
                     );
                 })}
-            </View>
-            <TouchableOpacity onPress={() => setShowSelector(false)} style={styles.abortBtn}>
-              <Text style={styles.abortText}>RETURN HOME</Text>
-            </TouchableOpacity>
+            </div>
+            <TouchableOpacity onPress={() => setShowSelector(false)} style={styles.abortBtn}><Text style={styles.abortText}>RETURN HOME</Text></TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -305,7 +335,7 @@ export default function HomeScreen({ navigation }) {
                 <View style={styles.onlineDot} />
             </View>
             <View>
-              <Text style={styles.nodeText}>Access: <Text style={{color: '#fff'}}>{userName} ▽</Text></Text>
+              <Text style={styles.nodeText}>Access: <Text style={{color: '#fff', fontSize: 10}}>{userName} ▽</Text></Text>
               <Text style={styles.title}>EXAM<Text style={{color: '#a855f7'}}>READINESS</Text></Text>
             </View>
           </TouchableOpacity>
@@ -324,11 +354,13 @@ export default function HomeScreen({ navigation }) {
                       </TouchableOpacity>
                   </View>
                   <Text style={styles.typingText}>{readinessText}</Text>
+                  
                   <TouchableOpacity 
                     style={styles.challengeBtn} 
                     onPress={() => {
                       const randomIndex = Math.floor(Math.random() * subjectsConfig.length);
-                      openDifficultySelector(subjectsConfig[randomIndex].name);
+                      const randomSubject = subjectsConfig[randomIndex].name;
+                      openDifficultySelector(randomSubject);
                     }}
                   >
                       <Text style={styles.challengeBtnText}>ACTIVATE CHALLENGE</Text>
@@ -355,9 +387,7 @@ export default function HomeScreen({ navigation }) {
                     </View>
                     <Text style={styles.moduleName}>{s.name.toUpperCase()}</Text>
                     <View style={styles.progressRow}>
-                      <View style={styles.barBg}>
-                        <View style={[styles.barFill, { width: `${subjectProgress[s.name]?.bestScore || 0}%`, backgroundColor: s.color }]} />
-                      </View>
+                      <View style={styles.barBg}><View style={[styles.barFill, { width: `${subjectProgress[s.name]?.bestScore || 0}%`, backgroundColor: s.color }]} /></View>
                       <Text style={styles.pctText}>{subjectProgress[s.name]?.bestScore || 0}%</Text>
                     </View>
                   </TouchableOpacity>
@@ -376,10 +406,12 @@ const styles = StyleSheet.create({
   loadingText: { marginTop: 20, fontSize: 11, fontWeight: '900', letterSpacing: 2, textAlign: 'center' },
   pleaseWaitText: { color: 'rgba(255,255,255,0.4)', fontSize: 9, marginTop: 8, letterSpacing: 4, fontWeight: '700' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 25, paddingBottom: 15, paddingTop: Platform.OS === 'android' ? 45 : 10 },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  miniAvatar: { width: 42, height: 42, borderRadius: 21, borderWidth: 1.5, borderColor: '#6366f1', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
-  miniAvatarText: { color: '#6366f1', fontSize: 16, fontWeight: '900' },
-  onlineDot: { position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: 6, backgroundColor: '#10b981', borderWidth: 2, borderColor: '#020617' },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 15 },
+  
+  dashboardAvatar: { width: 58, height: 58, borderRadius: 29, borderWidth: 2, borderColor: '#6366f1', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  dashboardAvatarText: { color: '#6366f1', fontSize: 24, fontWeight: '900' },
+  
+  onlineDot: { position: 'absolute', bottom: 2, right: 2, width: 14, height: 14, borderRadius: 7, backgroundColor: '#10b981', borderWidth: 2, borderColor: '#020617' },
   
   avatarCircleLarge: { width: 90, height: 90, borderRadius: 45, borderWidth: 2, borderColor: '#6366f1', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   avatarLetterLarge: { color: '#fff', fontSize: 35, fontWeight: '900' },

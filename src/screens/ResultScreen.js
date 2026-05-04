@@ -19,12 +19,13 @@ export default function ResultScreen({ route, navigation }) {
         const newResult = {
           subject: subject || "General",
           difficulty: difficulty || "Normal",
-          score: Math.round(percentage), // Ginawa nating percentage ang score para sa analytics
+          score: Math.round(percentage), // In percentage for analytics
           totalQuestions: totalQuestions,
-          date: new Date().toLocaleDateString(), // Para maganda ang format sa logs
+          date: new Date().toISOString(), // Standard format para sa sorting
         };
 
-        await StorageService.saveResult(newResult);
+        // FIXED: Binago mula saveResult -> saveQuizResult para tugma sa storageService.js
+        await StorageService.saveQuizResult(newResult);
         console.log("SYSTEM LOG: Stats synchronized to unique user key.");
       } catch (e) {
         console.error("Failed to save log", e);

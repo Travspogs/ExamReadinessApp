@@ -7,20 +7,24 @@ const KEYS = {
 };
 
 export const StorageService = {
-  // FIXED: Sinigurado na hindi magbabalik ng generic key kung walang user
+  // UNIQUE KEY PER USER: Dito sinisiguro na hindi maghahalo ang data nina Juan at Maria
   async getUserKey(baseKey) {
     try {
       const userData = await AsyncStorage.getItem(KEYS.CURRENT_USER);
       if (userData) {
         const user = JSON.parse(userData);
-        // Gamitin ang 'contact' (email o phone) bilang unique ID
-        const identifier = user.contact || user.email;
+        // Identifier prioritize: email -> contact -> fullName
+        const identifier = user.email || user.contact || user.fullName;
+        
         if (!identifier) return `${baseKey}_guest`;
         
+        // Nililinis ang symbols para maging valid key name (@ at . ginagawang _)
         const safeId = identifier.replace(/[@.]/g, '_');
-        return `${baseKey}_${safeId}`;
+        const finalKey = `${baseKey}_${safeId}`;
+        
+        console.log(`[StorageService] Accessing storage for:`, finalKey);
+        return finalKey;
       }
-      // Kapag walang naka-login, lagyan ng 'unauthenticated' para hindi humalo sa iba
       return `${baseKey}_unauthenticated`;
     } catch (e) {
       return `${baseKey}_error`;
@@ -43,17 +47,22 @@ export const StorageService = {
         status: score >= 75 ? 'PASSED' : 'FAILED'
       };
 
-      // 1. I-save sa Personal Results (Unique per User)
+      // 1. Kunin ang unique key para sa user na ito
       const userSpecificKey = await this.getUserKey(KEYS.RESULTS);
-      const existingResults = await this.getResults();
+      
+      // 2. Kunin ang existing personal results
+      const personalDataRaw = await AsyncStorage.getItem(userSpecificKey);
+      const existingResults = personalDataRaw ? JSON.parse(personalDataRaw) : [];
+
+      // 3. I-save pabalik (Personal)
       await AsyncStorage.setItem(
         userSpecificKey,
         JSON.stringify([resultEntry, ...existingResults])
       );
 
-      // 2. I-save sa Global Leaderboard (Lahat ng user makakakita nito)
+      // 4. Global Leaderboard (Para sa lahat ng users)
       await this.saveLeaderboard({
-        name: user.fullName,
+        name: user.fullName || "STUDENT",
         score: Math.round(score),
         subject: subject,
         date: timestamp
@@ -71,9 +80,11 @@ export const StorageService = {
       const userSpecificKey = await this.getUserKey(KEYS.RESULTS);
       const data = await AsyncStorage.getItem(userSpecificKey);
       
-      // Kung bagong account at wala pang data, dapat empty array [] ang ibalik
+      // Kung bagong user, automatic empty array []. 
+      // Pag empty array, ang Insights screen ay magpapakita ng "MORE DATA REQ."
       return data ? JSON.parse(data) : [];
     } catch (e) {
+      console.error("GetResults Error:", e);
       return [];
     }
   },
@@ -85,11 +96,11 @@ export const StorageService = {
 
       const newEntry = {
         ...entry,
-        exp: entry.score * 10, 
+        exp: (entry.score || 0) * 10, 
       };
 
       const updated = [newEntry, ...existing]
-        .sort((a, b) => b.score - a.score)
+        .sort((a, b) => (b.score || 0) - (a.score || 0))
         .slice(0, 50);
 
       await AsyncStorage.setItem(KEYS.LEADERBOARD, JSON.stringify(updated));
@@ -99,23 +110,31 @@ export const StorageService = {
   },
 
   async getLeaderboard() {
-    const data = await AsyncStorage.getItem(KEYS.LEADERBOARD);
-    return data ? JSON.parse(data) : [];
+    try {
+      const data = await AsyncStorage.getItem(KEYS.LEADERBOARD);
+      return data ? JSON.parse(data) : [];
+    } catch (e) {
+      return [];
+    }
   },
 
   async getSubjectProgress() {
-    const results = await this.getResults();
-    const progress = {};
-    
-    results.forEach(res => {
-      if (!progress[res.subject] || res.score > progress[res.subject].bestScore) {
-        progress[res.subject] = { 
-          bestScore: res.score,
-          lastAttempt: res.date
-        };
-      }
-    });
-    
-    return progress;
+    try {
+      const results = await this.getResults();
+      const progress = {};
+      
+      results.forEach(res => {
+        if (!progress[res.subject] || res.score > progress[res.subject].bestScore) {
+          progress[res.subject] = { 
+            bestScore: res.score,
+            lastAttempt: res.date
+          };
+        }
+      });
+      
+      return progress;
+    } catch (e) {
+      return {};
+    }
   }
 };
