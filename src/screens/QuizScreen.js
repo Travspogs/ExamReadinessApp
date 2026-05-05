@@ -1,144 +1,152 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
-  KeyboardAvoidingView, Platform,
-  SafeAreaView, ScrollView, StyleSheet, Text, TextInput,
-  TouchableOpacity, View
+  Animated,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Vibration,
+  View
 } from 'react-native';
 import { questions } from '../data/questions';
-import { StorageService } from "../utils/storageService";
-
-const { width } = Dimensions.get('window');
 
 export default function QuizScreen({ route, navigation }) {
   const { subject, difficulty } = route.params || {};
   const [currentIdx, setCurrentIdx] = useState(0);
   const [loading, setLoading] = useState(true);
   const [quizSet, setQuizSet] = useState([]);
-  const [userAnswers, setUserAnswers] = useState({}); 
-  const [isSaving, setIsSaving] = useState(false); // Iwas double-save
+  const [userAnswers, setUserAnswers] = useState({});
+
+  // --- ANIMATIONS ---
+  const [timeLeft, setTimeLeft] = useState(0);
+  const timerRef = useRef(null);
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+  const btnBgAnim = useRef(new Animated.Value(0)).current; // Para sa Black to Purple active state
+
+  const isLastQuestion = currentIdx + 1 === quizSet.length;
+  const currentSelection = userAnswers[currentIdx] || "";
+
+  const getDuration = () => {
+    switch (difficulty?.toLowerCase()) {
+      case 'easy': return 10
+      case 'medium': return 20;
+      case 'hard': return 30;
+      default: return 30;
+    }
+  };
+
+  // Button Hover Effect (Press In/Out) - Mobile active state mimic
+  const handlePressIn = () => {
+    if (!currentSelection) return;
+    Animated.timing(btnBgAnim, { toValue: 1, duration: 120, useNativeDriver: false }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.timing(btnBgAnim, { toValue: 0, duration: 200, useNativeDriver: false }).start();
+  };
+
+  const interpolatedBtnColor = btnBgAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#0b0c14', '#a855f7'] // Black to Purple active effect
+  });
+
+  const triggerShake = () => {
+    Animated.sequence([
+      Animated.timing(shakeAnim, { toValue: 4, duration: 40, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -4, duration: 40, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0, duration: 40, useNativeDriver: true }),
+    ]).start();
+  };
 
   useEffect(() => {
     if (subject && difficulty && questions[subject] && questions[subject][difficulty]) {
       const allQuestionsPool = questions[subject][difficulty];
-      const shuffled = [...allQuestionsPool].sort(() => Math.random() - 0.5);
-      const selectedTen = shuffled.slice(0, 10);
-      
+      const selectedTen = [...allQuestionsPool].sort(() => Math.random() - 0.5).slice(0, 10);
       setQuizSet(selectedTen);
+      setTimeLeft(getDuration());
       setLoading(false);
     } else {
       setLoading(false);
-      Alert.alert(
-        "Data Error", 
-        `No questions found for ${subject} (${difficulty}).`,
-        [{ text: "Go Back", onPress: () => navigation.goBack() }]
-      );
+      Alert.alert("Error", "No questions found.", [{ text: "Back", onPress: () => navigation.goBack() }]);
     }
   }, [subject, difficulty]);
 
-  const handleSelect = (val) => {
-    setUserAnswers({ ...userAnswers, [currentIdx]: val });
-  };
+  useEffect(() => {
+    if (loading || quizSet.length === 0) return;
+    if (timerRef.current) clearInterval(timerRef.current);
+
+    timerRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current);
+          handleNext();
+          return 0;
+        }
+        if (prev <= 6) triggerShake(); 
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timerRef.current);
+  }, [currentIdx, loading]);
 
   const handleNext = () => {
+    Vibration.vibrate(15); // Subtle feedback
     if (currentIdx + 1 < quizSet.length) {
       setCurrentIdx(currentIdx + 1);
+      setTimeLeft(getDuration());
     } else {
       calculateFinalResults();
     }
   };
 
-  const handleBack = () => {
-    if (currentIdx > 0) {
-      setCurrentIdx(currentIdx - 1);
-    }
-  };
-
   const sanitize = (str) => {
     if (!str) return "";
-    return str.toString()
-      .toLowerCase()
-      .trim()
-      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "") 
-      .replace(/\s+/g, ""); 
+    return str.toString().toLowerCase().trim().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "").replace(/\s+/g, "");
   };
 
   const calculateFinalResults = async () => {
-    if (isSaving) return; // Proteksyon sa double submission
-    setIsSaving(true);
-
-    let finalScoreCount = 0;
-    let wrongAnswersList = [];
-
-    quizSet.forEach((q, index) => {
-      const uAns = userAnswers[index] || "";
-      const isCorrect = sanitize(uAns) === sanitize(q.answer);
-      
-      if (isCorrect) {
-        finalScoreCount++;
-      } else {
-        wrongAnswersList.push({ ...q, userAnswer: uAns });
-      }
+    if (timerRef.current) clearInterval(timerRef.current);
+    let score = 0;
+    let wrongs = [];
+    quizSet.forEach((q, i) => {
+      if (sanitize(userAnswers[i]) === sanitize(q.answer)) score++;
+      else wrongs.push({ ...q, userAnswer: userAnswers[i] });
     });
 
-    const scorePercentage = (finalScoreCount / quizSet.length) * 100;
-
-    try {
-      // Sinisigurado na unique ang pag-save base sa email/contact na nilagay natin sa Login
-      const saveStatus = await StorageService.saveQuizResult({
-        subject: subject,
-        difficulty: difficulty,
-        score: scorePercentage,
-        date: new Date().toISOString(), 
-      });
-
-      if (!saveStatus) {
-        console.warn("Storage warning: Result saved but may have issues with unique key.");
-      }
-    } catch (error) {
-      console.log("Error saving results:", error);
-    }
-
-    navigation.replace("Result", { 
-      score: finalScoreCount, 
-      totalQuestions: quizSet.length, 
-      subject, 
-      difficulty, 
-      wrongAnswers: wrongAnswersList 
+    navigation.replace("Result", {
+      score, totalQuestions: quizSet.length, subject, difficulty, wrongAnswers: wrongs
     });
   };
 
-  if (loading || isSaving) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator color="#6366f1" size="large" />
-        {isSaving && <Text style={{color: '#fff', marginTop: 10}}>SYNCING RESULTS...</Text>}
-      </View>
-    );
-  }
-
-  if (quizSet.length === 0) {
-    return (
-      <View style={styles.center}>
-        <Text style={{color: '#fff'}}>No Questions Available</Text>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={{color: '#6366f1', marginTop: 10}}>Go Back</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  if (loading) return <View style={styles.center}><ActivityIndicator color="#6366f1" size="large" /></View>;
 
   const currentQ = quizSet[currentIdx];
-  const currentSelection = userAnswers[currentIdx] || "";
+  const timerColor = timeLeft <= 5 ? "#ef4444" : "#a855f7";
 
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+        
+        {/* CENTERED HEADER */}
         <View style={styles.header}>
-          <Text style={styles.nodeText}>SUBJECT : {subject?.toUpperCase()} EXAM</Text>
-          <Text style={styles.progressText}>{currentIdx + 1}/{quizSet.length}</Text>
+          <View style={styles.headerSide}>
+            <Text style={styles.nodeText}>SUBJECT: {subject?.toUpperCase()}</Text>
+            <Text style={styles.difficultyTag}>{difficulty?.toUpperCase()} MODE</Text>
+          </View>
+          <View style={styles.headerCenter}>
+            <Animated.View style={[styles.timerBadge, { borderColor: timerColor, transform: [{ translateX: shakeAnim }] }]}>
+              <Text style={[styles.timerText, { color: timerColor }]}>{timeLeft}s</Text>
+            </Animated.View>
+          </View>
+          <View style={[styles.headerSide, { alignItems: 'flex-end' }]}>
+            <Text style={styles.progressText}>{currentIdx + 1}/{quizSet.length}</Text>
+          </View>
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -148,72 +156,81 @@ export default function QuizScreen({ route, navigation }) {
           </View>
 
           <View style={styles.boardContainer}>
+            {/* accordionBoard: Glassmorphism effect */}
             <View style={styles.accordionBoard}>
+              
+              {/* BOARD HEADER */}
               <View style={styles.boardHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.nodeId}>Reminder! {currentQ?.type}</Text>
-                  <Text style={styles.caseHint}>(Case Insensitive / Symbols Ignored)</Text>
-                  <Text style={styles.questionText}>{currentQ?.question}</Text>
+                <View style={styles.badgeRow}>
+                  <Text style={styles.typeBadge}>{currentQ?.type}</Text>
+                  <View style={styles.dotSeparator} />
+                  <Text style={styles.hintText}>AUTO PROCEED</Text>
                 </View>
+                <Text style={styles.questionText}>{currentQ?.question}</Text>
               </View>
 
+              {/* BOARD BODY */}
               <View style={styles.boardBody}>
-                <Text style={styles.instructText}>DOUBLE CHECK ANSWER</Text>
+                <View style={styles.instructWrapper}>
+                  <Text style={styles.instructTitle}>INSTRUCTION:</Text>
+                  <Text style={styles.instructSub}>Case Insensitive • Symbols & Spaces Ignored</Text>
+                </View>
 
                 {currentQ?.type === "MCQ" ? (
                   <View style={styles.optionsList}>
                     {currentQ?.choices?.map((choice, i) => (
                       <TouchableOpacity 
                         key={i} 
-                        style={[
-                          styles.choiceRow, 
-                          currentSelection === choice && styles.choiceActive
-                        ]} 
-                        onPress={() => handleSelect(choice)}
+                        style={[styles.choiceRow, currentSelection === choice && styles.choiceActive]} 
+                        onPress={() => setUserAnswers({...userAnswers, [currentIdx]: choice})}
                       >
                         <Text style={[styles.choiceLabel, currentSelection === choice && { color: '#fff' }]}>{choice}</Text>
+                        {/* ActionIndicator placement */}
                         <View style={[styles.actionCircle, currentSelection === choice && styles.actionCircleActive]}>
-                          <Text style={[styles.plusSign, currentSelection === choice && { color: '#fff' }]}>
-                            {currentSelection === choice ? '✓' : '+'}
-                          </Text>
+                          <Text style={[styles.plusSign, currentSelection === choice && { color: '#fff' }]}>{currentSelection === choice ? '✓' : '+'}</Text>
                         </View>
                       </TouchableOpacity>
                     ))}
                   </View>
                 ) : (
-                  <View style={styles.inputWrapper}>
+                  <View style={styles.terminalContainer}>
+                    <Text style={styles.terminalLabel}>DOUBLE CHECK ANSWER</Text>
                     <TextInput 
                       style={styles.terminalInput}
                       placeholder="Type your Answer"
-                      placeholderTextColor="#475569"
+                      placeholderTextColor="#334155"
                       value={currentSelection}
-                      onChangeText={handleSelect}
+                      onChangeText={(val) => setUserAnswers({...userAnswers, [currentIdx]: val})}
+                      autoCorrect={false}
                     />
                   </View>
                 )}
               </View>
 
-              <View style={styles.splitFooter}>
-                <TouchableOpacity 
-                  style={[styles.footerHalf, styles.footerBack, currentIdx === 0 && { opacity: 0.2 }]} 
-                  onPress={handleBack}
-                  disabled={currentIdx === 0}
-                >
-                  <Text style={styles.footerBackText}>BACK</Text>
-                </TouchableOpacity>
+              {/* ACTION FOOTER */}
+              <View style={styles.footerContainer}>
+                <View style={styles.progressBarBackground}>
+                  <View style={[styles.progressBarFill, { width: `${((currentIdx + 1) / quizSet.length) * 100}%` }]} />
+                </View>
 
-                <TouchableOpacity 
-                  style={[styles.footerHalf, styles.footerNext, !currentSelection && styles.footerDisabled]} 
-                  onPress={handleNext}
-                  disabled={!currentSelection}
-                >
-                  <Text style={styles.footerNextText}>
-                    {currentIdx + 1 === quizSet.length ? "FINISH" : "NEXT"}
-                  </Text>
-                </TouchableOpacity>
+                <Animated.View style={{ backgroundColor: interpolatedBtnColor, borderRadius: 18, borderWidth: 1, borderColor: '#ffffff10' }}>
+                  <TouchableOpacity 
+                    activeOpacity={1} // Important for PressIn effect
+                    onPressIn={handlePressIn}
+                    onPressOut={handlePressOut}
+                    onPress={handleNext}
+                    disabled={!currentSelection}
+                    style={[styles.modernNextBtn, !currentSelection && styles.modernBtnDisabled]}
+                  >
+                    <Text style={styles.modernBtnText}>
+                      {isLastQuestion ? "FINISH" : "NEXT"}
+                    </Text>
+                    <Text style={styles.arrowIcon}>{isLastQuestion ? "✓" : "→"}</Text>
+                  </TouchableOpacity>
+                </Animated.View>
               </View>
+
             </View>
-            <View style={styles.boardShadow} />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -221,40 +238,59 @@ export default function QuizScreen({ route, navigation }) {
   );
 }
 
-// *** GAMITIN ANG IYONG EXISTING STYLES SA BABA ***
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#02040d" },
   center: { flex: 1, backgroundColor: "#02040d", justifyContent: 'center', alignItems: 'center' },
-  header: { paddingHorizontal: 30, paddingTop: 50, paddingBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  nodeText: { color: "#6366f1", fontSize: 10, fontWeight: "900", letterSpacing: 2 },
+  
+  // Header Spacing & Details
+  header: { paddingHorizontal: 25, paddingTop: 50, paddingBottom: 15, flexDirection: 'row', alignItems: 'center' },
+  headerSide: { flex: 1 },
+  headerCenter: { flex: 1, alignItems: 'center' },
+  nodeText: { color: "#6366f1", fontSize: 10, fontWeight: "900", letterSpacing: 1.8 },
+  difficultyTag: { color: "#475569", fontSize: 8, fontWeight: "bold" },
   progressText: { color: "#475569", fontSize: 11, fontWeight: "bold" },
-  scrollContent: { paddingHorizontal: 30, paddingBottom: 50 },
-  titleSection: { marginVertical: 30 },
-  subTag: { color: "#6366f1", fontSize: 12, fontWeight: "700", marginBottom: 8 },
-  mainTitle: { color: "#fff", fontSize: 32, fontWeight: "800", lineHeight: 36 },
+  timerBadge: { borderWidth: 1.5, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, backgroundColor: '#0b0c14', minWidth: 70, alignItems: 'center' },
+  timerText: { fontSize: 15, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  
+  scrollContent: { paddingHorizontal: 25, paddingBottom: 50 },
+  titleSection: { marginVertical: 35 },
+  subTag: { color: "#6366f1", fontSize: 12, fontWeight: "700", marginBottom: 8, letterSpacing: 1 },
+  mainTitle: { color: "#fff", fontSize: 32, fontWeight: "900", lineHeight: 38 },
+  
   boardContainer: { width: '100%', alignItems: 'center' },
-  accordionBoard: { width: '100%', maxWidth: 500, backgroundColor: "#0b0c14", borderRadius: 24, borderWidth: 1, borderColor: "#6366f130", overflow: 'hidden' },
-  boardHeader: { padding: 24, borderBottomWidth: 1, borderBottomColor: "#1a1b26" },
-  nodeId: { color: "#a855f7", fontSize: 9, fontWeight: "900", marginBottom: 2 },
-  caseHint: { color: "#475569", fontSize: 8, fontWeight: "700", marginBottom: 8, letterSpacing: 0.5 },
-  questionText: { color: "#fff", fontSize: 18, fontWeight: "800", lineHeight: 24 },
-  boardBody: { padding: 20 },
-  instructText: { fontSize: 10, color: "#475569", marginBottom: 15, fontWeight: '800', letterSpacing: 1 },
-  optionsList: { gap: 12 },
-  choiceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: "#02040d", padding: 16, borderRadius: 14, borderWidth: 1, borderColor: "#1a1b26" },
-  choiceActive: { borderColor: '#a855f7', backgroundColor: '#a855f715' },
-  choiceLabel: { color: "#94a3b8", fontSize: 14, fontWeight: "600" },
+  // accordianBoard: Premium look with transparency
+  accordionBoard: { width: '100%', maxWidth: 500, backgroundColor: "#ffffff03", borderRadius: 28, borderWidth: 1, borderColor: "#ffffff08", overflow: 'hidden' },
+  
+  boardHeader: { padding: 28, borderBottomWidth: 1, borderBottomColor: "#1a1b26" },
+  badgeRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  typeBadge: { color: "#a855f7", fontSize: 10, fontWeight: "900", letterSpacing: 1 },
+  dotSeparator: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#334155', marginHorizontal: 10 },
+  hintText: { color: "#475569", fontSize: 9, fontWeight: "800", letterSpacing: 0.5 },
+  questionText: { color: "#fff", fontSize: 20, fontWeight: "800", lineHeight: 28 },
+  
+  boardBody: { padding: 24 },
+  instructWrapper: { marginBottom: 24, alignItems: 'center', backgroundColor: '#ffffff05', paddingVertical: 14, borderRadius: 16, borderWidth: 1, borderColor: '#ffffff10' },
+  instructTitle: { fontSize: 9, color: "#6366f1", fontWeight: '900', letterSpacing: 1.2, marginBottom: 4 },
+  instructSub: { fontSize: 10, color: "#94a3b8", fontWeight: '600' },
+  
+  optionsList: { gap: 14 },
+  choiceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: "#02040d", padding: 18, borderRadius: 16, borderWidth: 1, borderColor: "#1a1b26" },
+  choiceActive: { borderColor: '#a855f750', backgroundColor: '#a855f710' },
+  choiceLabel: { color: "#94a3b8", fontSize: 15, fontWeight: "600" },
   actionCircle: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#1a1b26", justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: "#6366f130" },
   actionCircleActive: { backgroundColor: '#a855f7', borderColor: '#a855f7' },
   plusSign: { color: "#6366f1", fontWeight: "bold", fontSize: 14 },
-  inputWrapper: { backgroundColor: "#02040d", borderRadius: 14, borderWidth: 1, borderColor: "#1a1b26" },
-  terminalInput: { padding: 16, color: "#fff", fontSize: 15 },
-  splitFooter: { flexDirection: 'row', height: 70, borderTopWidth: 1, borderTopColor: '#1a1b26' },
-  footerHalf: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  footerBack: { backgroundColor: '#0f111a' },
-  footerNext: { backgroundColor: '#a855f7' },
-  footerBackText: { color: '#475569', fontSize: 11, fontWeight: '900', letterSpacing: 1 },
-  footerNextText: { color: '#fff', fontSize: 11, fontWeight: '900', letterSpacing: 1 },
-  footerDisabled: { backgroundColor: '#1a1b26', opacity: 0.5 },
-  boardShadow: { height: 10, width: '92%', backgroundColor: "#0b0c1480", alignSelf: 'center', marginTop: -5, borderRadius: 20, zIndex: -1, borderWidth: 1, borderColor: "#1a1b26" },
+
+  // TERMINAL STYLE INPUT
+  terminalContainer: { backgroundColor: "#02040d80", borderRadius: 16, borderBottomWidth: 2, borderBottomColor: '#6366f190', overflow: 'hidden' },
+  terminalLabel: { fontSize: 8, color: '#475569', fontWeight: '900', letterSpacing: 1.5, paddingHorizontal: 18, paddingTop: 12 },
+  terminalInput: { paddingHorizontal: 18, paddingBottom: 18, paddingTop: 8, color: "#fff", fontSize: 16, fontWeight: '700' },
+
+  footerContainer: { backgroundColor: '#0f111a80', padding: 24, borderTopWidth: 1, borderTopColor: '#1a1b26' },
+  progressBarBackground: { height: 5, backgroundColor: '#1a1b26', borderRadius: 10, marginBottom: 24, overflow: 'hidden' },
+  progressBarFill: { height: '100%', backgroundColor: '#a855f7', borderRadius: 10 },
+  modernNextBtn: { height: 62, borderRadius: 18, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#ffffff05' },
+  modernBtnDisabled: { opacity: 0.3 },
+  modernBtnText: { color: '#fff', fontSize: 14, fontWeight: '900', letterSpacing: 2, marginRight: 12 },
+  arrowIcon: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
 });

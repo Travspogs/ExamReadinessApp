@@ -14,13 +14,11 @@ import SignUpScreen from "../screens/SignUpScreen";
 
 const Stack = createNativeStackNavigator();
 
-// 1. Idagdag ang { initialRouteName } bilang prop dito
-export default function AppNavigator({ initialRouteName }) {
+export default function AppNavigator() {
   return (
     <NavigationContainer>
       <Stack.Navigator
-        // 2. Palitan ang "Login" ng variable na initialRouteName
-        initialRouteName={initialRouteName || "Login"} 
+        initialRouteName="Login"
         screenOptions={{ headerShown: false }}
       >
         <Stack.Screen name="Login" component={LoginScreen} />
@@ -30,10 +28,8 @@ export default function AppNavigator({ initialRouteName }) {
         <Stack.Screen name="Input" component={InputScreen} />
         <Stack.Screen name="Result" component={ResultScreen} />
         <Stack.Screen name="Review" component={ReviewScreen} />
-        
-        <Stack.Screen name="Insights" component={InsightsScreen} /> 
+        <Stack.Screen name="Insights" component={InsightsScreen} />
         <Stack.Screen name="Analytics" component={AnalyticsScreen} />
-        
         <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
       </Stack.Navigator>
     </NavigationContainer>
