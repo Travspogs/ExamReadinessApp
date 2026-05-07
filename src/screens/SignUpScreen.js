@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
+  Animated,
+  Dimensions,
   Image,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -13,14 +14,23 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
-import { registerUser } from "../utils/auth";
+import { registerUser } from "../utils/auth"; // Make sure path is correct
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function SignUpScreen({ navigation }) {
+  // --- STATES (Retained) ---
   const [fullName, setFullName] = useState("");
   const [contact, setContact] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isHovered, setIsHovered] = useState(false); // For Hover effect
 
+  // --- ANIMATION REFS ---
+  const rotateX = useRef(new Animated.Value(0)).current;
+  const rotateY = useRef(new Animated.Value(0)).current;
+
+  // --- VALIDATION & SIGNUP LOGIC (RETAINED FROM OLD CODES) ---
   const handleSignUp = async () => {
     // 1. FULL NAME CHECK
     if (!fullName || fullName.trim().length === 0) {
@@ -52,7 +62,7 @@ export default function SignUpScreen({ navigation }) {
       }
     }
 
-    // 4. PASSWORD STRENGTH
+    // 4. PASSWORD STRENGTH (Symbol Required)
     const symbolRegex = /[!@#$%^&*(),.?":{}|<>]/;
     if (password.length < 8 || !symbolRegex.test(password)) {
       return Alert.alert(
@@ -77,106 +87,171 @@ export default function SignUpScreen({ navigation }) {
     }
   };
 
+  // --- ROBOT ANIMATION EFFECT ---
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const handleMouseMove = (event) => {
+        const tiltX = (event.clientY - SCREEN_HEIGHT / 2) / 30;
+        const turnY = (event.clientX - SCREEN_WIDTH / 2) / 20;
+        Animated.spring(rotateX, { toValue: -tiltX, useNativeDriver: false }).start();
+        Animated.spring(rotateY, { toValue: turnY, useNativeDriver: false }).start();
+      };
+      window.addEventListener('mousemove', handleMouseMove);
+      return () => window.removeEventListener('mousemove', handleMouseMove);
+    }
+  }, []);
+
+  const animatedImageStyle = {
+    transform: [
+      { perspective: 1000 },
+      { rotateX: Platform.OS === 'web' ? rotateX.interpolate({ inputRange: [-20, 20], outputRange: ['-20deg', '20deg'] }) : '0deg' },
+      { rotateY: Platform.OS === 'web' ? rotateY.interpolate({ inputRange: [-30, 30], outputRange: ['-30deg', '30deg'] }) : '0deg' },
+    ],
+  };
+
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <StatusBar barStyle="light-content" />
-      <ScrollView contentContainerStyle={styles.container} bounces={false} showsVerticalScrollIndicator={false}>
-
-        <View style={styles.left}>
-          <View style={styles.glow1} /><View style={styles.glow2} />
-          <View style={styles.aiWrapper}>
-            <Image source={require("../assets/ai-student.png")} style={styles.aiImage} />
-          </View>
-          <View style={styles.floatingInfo}>
-             <Text style={styles.infoText}>REGISTRATION STATUS: SECURE</Text>
-          </View>
-        </View>
-
-        <View style={styles.right}>
-          <View style={styles.card}>
-            <View style={styles.badge}><Text style={styles.badgeText}>USER REGISTRATION v3.1</Text></View>
-            <Text style={styles.title}>EXAM<Text style={{color: '#a855f7'}}>READINESS</Text></Text>
-            <Text style={styles.subtitle}>Identify Verification Required</Text>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Full Name</Text>
-              <TextInput 
-                placeholder="Juan Dela Cruz" 
-                onChangeText={setFullName} 
-                style={styles.input} 
-                placeholderTextColor="#475569" 
-              />
+      <View style={styles.mainContainer}>
+        
+        {/* MAIN BOARD (CONTENT CARD) */}
+        <View style={styles.contentCard}>
+          
+          {/* LEFT: VISUAL SECTION (Robot Moved to Left) */}
+          {(Platform.OS === 'web' || SCREEN_WIDTH > 800) && (
+            <View style={styles.visualSection}>
+              <View style={styles.glow1} />
+              <Animated.View style={animatedImageStyle}>
+                <Image source={require("../assets/ai-student.png")} style={styles.visualImg} />
+              </Animated.View>
+              <View style={styles.floatingInfo}><Text style={styles.infoText}>SECURE REGISTRATION NODE</Text></View>
             </View>
+          )}
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>HCDC Email or Mobile No.</Text>
-              <TextInput 
-                placeholder="firstname.lastname@hcdc.edu.ph" 
-                onChangeText={setContact} 
-                style={[
-                  styles.input, 
-                  contact.includes("@") && !contact.toLowerCase().endsWith("@hcdc.edu.ph") && { borderColor: '#ef4444' }
-                ]} 
-                placeholderTextColor="#475569" 
-                autoCapitalize="none" 
-              />
-            </View>
+          {/* RIGHT: SIGN UP FORM SECTION */}
+          <View style={styles.formSection}>
+            <View style={styles.authCard}>
+              <View style={styles.statusBadge}><Text style={styles.badgeText}>USER REGISTRATION v3.1</Text></View>
+              {/* Title with Purple color #a855f7 from old codes */}
+              <Text style={styles.mainTitle}>CREATE<Text style={{color: '#a855f7'}}>PROFILE</Text></Text>
+              <Text style={styles.subText}>Identify Verification Required.</Text>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Create Secure Password</Text>
-              <View style={styles.passwordWrapper}>
-                <TextInput
-                  placeholder="••••••••"
-                  secureTextEntry={!showPassword}
-                  onChangeText={setPassword}
-                  style={[styles.input, { flex: 1 }]}
-                  placeholderTextColor="#475569"
+              {/* FULL NAME INPUT */}
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Full Name</Text>
+                <TextInput 
+                  placeholder="Juan Dela Cruz" 
+                  onChangeText={setFullName} 
+                  style={styles.fieldInput} 
+                  placeholderTextColor="#475569" 
                 />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
-                  <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color="#a855f7" />
-                </TouchableOpacity>
               </View>
-              <Text style={styles.helperText}>Include at least one symbol (e.g. @, #, $)</Text>
+
+              {/* EMAIL/MOBILE INPUT */}
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>HCDC Email or Mobile No.</Text>
+                <TextInput 
+                  placeholder="user@hcdc.edu.ph" 
+                  onChangeText={setContact} 
+                  style={styles.fieldInput} 
+                  placeholderTextColor="#475569" 
+                  autoCapitalize="none"
+                />
+              </View>
+
+              {/* SECURE PASSWORD INPUT */}
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Security Password</Text>
+                <View style={styles.passInputWrapper}>
+                  <TextInput 
+                      placeholder="••••••••••••••••" 
+                      secureTextEntry={!showPassword} 
+                      onChangeText={setPassword} 
+                      style={styles.passInput} 
+                      placeholderTextColor="#475569" 
+                  />
+                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.iconPadding}>
+                    <Ionicons name={showPassword ? "eye-off" : "eye"} size={18} color="#a855f7" />
+                  </TouchableOpacity>
+                </View>
+                {/* Helper text retained */}
+                <Text style={styles.helperText}>Include at least one symbol (e.g. @, #, $)</Text>
+              </View>
+
+              {/* Purple Button #a855f7 */}
+              <TouchableOpacity style={styles.executeBtn} onPress={handleSignUp}>
+                  <Text style={styles.btnText}>REGISTER NOW</Text>
+              </TouchableOpacity>
+
+              {/* Login Link with hover effect */}
+              <TouchableOpacity 
+                  onPress={() => navigation.navigate("Login")} 
+                  style={styles.bottomLink}
+                  onMouseEnter={() => setIsHovered(true)}
+                  onMouseLeave={() => setIsHovered(false)}
+              >
+                <Text style={styles.linkText}>Already verified? <Text style={[styles.linkHighlight, isHovered && {color: '#c084fc', textDecorationLine: 'underline'}]}>Log In</Text></Text>
+              </TouchableOpacity>
             </View>
-
-            <TouchableOpacity activeOpacity={0.8} onPress={handleSignUp} style={styles.button}>
-              <Text style={styles.buttonText}>REGISTER NOW</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.linkContainer} onPress={() => navigation.navigate("Login")}>
-              <Text style={styles.linkBase}>Already verified? <Text style={styles.linkHighlight}>Log In</Text></Text>
-            </TouchableOpacity>
           </View>
+
         </View>
-      </ScrollView>
+      </View>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flexDirection: "row", flexGrow: 1, backgroundColor: "#020512" },
-  left: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#0B0F19" },
-  right: { flex: 1.2, justifyContent: "center", alignItems: "center", padding: 30 },
-  card: { width: "100%", maxWidth: 400, padding: 20 },
-  badge: { backgroundColor: "rgba(168, 85, 247, 0.1)", alignSelf: "flex-start", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: "rgba(168, 85, 247, 0.3)", marginBottom: 20 },
-  badgeText: { color: "#a855f7", fontSize: 9, fontWeight: "900", letterSpacing: 1.5 },
-  title: { fontSize: 36, fontWeight: "900", color: "#fff" },
-  subtitle: { marginBottom: 30, color: "#475569", fontSize: 14 },
-  inputContainer: { marginBottom: 18 },
-  label: { fontSize: 10, fontWeight: "900", color: "#a855f7", marginBottom: 10, letterSpacing: 1 },
-  input: { backgroundColor: "#0B0F19", borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.05)", padding: 16, borderRadius: 12, color: "#fff", fontSize: 14, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
-  passwordWrapper: { flexDirection: 'row', alignItems: 'center' },
-  eyeBtn: { position: 'absolute', right: 15 },
-  warningText: { color: '#ef4444', fontSize: 9, marginTop: 5, fontWeight: 'bold' },
+  mainContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  
+  // Floating Board styling retained
+  contentCard: { 
+    flexDirection: 'row', 
+    width: '100%', 
+    maxWidth: 1000, 
+    height: 700, 
+    backgroundColor: '#020617', 
+    borderRadius: 30, 
+    borderWidth: 1, 
+    borderColor: 'rgba(168, 85, 247, 0.2)', // Purple border shadow
+    overflow: 'hidden',
+    shadowColor: "#a855f7", // Purple shadow for floating effect
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 30,
+    elevation: 10
+  },
+
+  // Visual Section (Robot now on Left)
+  visualSection: { flex: 1.2, backgroundColor: '#0B0F19', justifyContent: 'center', alignItems: 'center', borderRightWidth: 1, borderRightColor: 'rgba(255,255,255,0.05)' },
+  visualImg: { width: 500, height: 500, resizeMode: 'contain' }, // Palaking robot
+  glow1: { position: 'absolute', width: 400, height: 400, borderRadius: 200, backgroundColor: 'rgba(168, 85, 247, 0.05)' },
+  floatingInfo: { position: 'absolute', bottom: 30, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#1e293b' },
+  infoText: { color: '#a855f7', fontSize: 9, fontWeight: '800' },
+
+  // Form Section (Right Side)
+  formSection: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+  authCard: { width: '100%', maxWidth: 350 },
+
+  // Badge using Purple colors from old codes
+  statusBadge: { backgroundColor: 'rgba(168, 85, 247, 0.1)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 4, alignSelf: 'flex-start', borderWidth: 1, borderColor: 'rgba(168, 85, 247, 0.3)', marginBottom: 15 },
+  badgeText: { color: '#a855f7', fontSize: 9, fontWeight: '800', letterSpacing: 1 },
+  mainTitle: { fontSize: 32, fontWeight: '900', color: '#fff', letterSpacing: -1 },
+  subText: { color: '#475569', fontSize: 13, marginTop: 5, marginBottom: 30 },
+  
+  fieldGroup: { marginBottom: 15 },
+  fieldLabel: { color: '#a855f7', fontSize: 10, fontWeight: '700', marginBottom: 8, textTransform: 'uppercase' },
+  fieldInput: { backgroundColor: '#eff6ff', height: 50, borderRadius: 12, paddingHorizontal: 15, color: '#1e293b', fontSize: 14 },
+  
+  passInputWrapper: { flexDirection: 'row', backgroundColor: '#eff6ff', borderRadius: 12, alignItems: 'center' },
+  passInput: { flex: 1, height: 50, paddingHorizontal: 15, color: '#1e293b' },
+  iconPadding: { paddingRight: 15 },
+  
   helperText: { color: '#475569', fontSize: 9, marginTop: 5 },
-  button: { backgroundColor: "#a855f7", padding: 18, borderRadius: 12, alignItems: "center", marginTop: 10 },
-  buttonText: { color: "#fff", fontWeight: "900", fontSize: 12, letterSpacing: 2 },
-  linkContainer: { marginTop: 30, alignItems: "center" },
-  linkBase: { color: "#475569", fontSize: 12 },
-  linkHighlight: { color: "#a855f7", fontWeight: "900", textDecorationLine: 'underline' },
-  aiImage: { width: 600, height: 600, resizeMode: "contain" },
-  glow1: { position: "absolute", width: 300, height: 300, backgroundColor: "#a855f7", borderRadius: 150, opacity: 0.05, top: -50, left: -50 },
-  glow2: { position: "absolute", width: 300, height: 300, backgroundColor: "#6366f1", borderRadius: 150, opacity: 0.05, bottom: -100, right: -50 },
-  floatingInfo: { position: "absolute", bottom: 40, backgroundColor: "rgba(11, 15, 25, 0.8)", paddingHorizontal: 15, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" },
-  infoText: { fontSize: 9, color: "#a855f7", fontWeight: "900", letterSpacing: 1 }
+  executeBtn: { backgroundColor: '#a855f7', width: '100%', height: 50, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginTop: 10 },
+  btnText: { color: '#fff', fontSize: 13, fontWeight: '900', letterSpacing: 1 },
+  
+  bottomLink: { alignItems: 'center', marginTop: 25 },
+  linkText: { color: '#475569', fontSize: 12 },
+  linkHighlight: { color: '#a855f7', fontWeight: '800' }
 });

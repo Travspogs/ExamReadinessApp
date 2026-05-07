@@ -35,10 +35,10 @@ export default function LoginScreen({ navigation }) {
   const [resetModal, setResetModal] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [isHovered, setIsHovered] = useState(false);
 
   const rotateX = useRef(new Animated.Value(0)).current;
   const rotateY = useRef(new Animated.Value(0)).current;
-  const floatAnim = useRef(new Animated.Value(0)).current;
 
   // --- GOOGLE & FB PROVIDERS ---
   const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
@@ -58,7 +58,26 @@ export default function LoginScreen({ navigation }) {
     navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
   };
 
-  // --- AUTH LOGIC ---
+  // --- FACEBOOK AUTH REDIRECT FIX ---
+  useEffect(() => {
+    if (fbResponse?.type === 'success') {
+      const { access_token } = fbResponse.params;
+      const fetchFBUser = async () => {
+        try {
+          const response = await fetch(`https://graph.facebook.com/me?access_token=${access_token}&fields=id,name,email`);
+          const user = await response.json();
+          const userData = { fullName: user.name, email: user.email || user.id, id: user.id };
+          await AsyncStorage.setItem('current_user', JSON.stringify(userData));
+          handleNavigationToHome();
+        } catch (e) {
+          handleNavigationToHome();
+        }
+      };
+      fetchFBUser();
+    }
+  }, [fbResponse]);
+
+  // --- GOOGLE AUTH REDIRECT ---
   useEffect(() => {
     if (googleResponse?.type === 'success') {
       const { authentication } = googleResponse;
@@ -77,6 +96,7 @@ export default function LoginScreen({ navigation }) {
     }
   }, [googleResponse]);
 
+  // --- LOGIN LOGIC ---
   const handleLogin = async () => {
     setEmailError("");
     setPasswordError("");
@@ -92,12 +112,10 @@ export default function LoginScreen({ navigation }) {
           (u.email && u.email.toLowerCase() === email.trim().toLowerCase()) || 
           (u.contact && u.contact === email.trim())
         );
-
         const userData = {
           fullName: foundUser ? (foundUser.fullName || foundUser.fullname) : "STUDENT",
           email: email.trim().toLowerCase(), 
         };
-        
         await AsyncStorage.setItem('current_user', JSON.stringify(userData));
         handleNavigationToHome();
       } else {
@@ -108,37 +126,26 @@ export default function LoginScreen({ navigation }) {
     }
   };
 
-  // --- RESET PASSWORD LOGIC ---
   const handleResetPassword = async () => {
-    if (!resetEmail || !newPassword) {
-      return Alert.alert("Error", "Please fill in all fields.");
-    }
-
+    if (!resetEmail || !newPassword) return Alert.alert("Error", "Please fill in all fields.");
     try {
       const allUsersData = await AsyncStorage.getItem('registered_users');
       let users = allUsersData ? JSON.parse(allUsersData) : [];
-      
       const userIndex = users.findIndex(u => 
         (u.email && u.email.toLowerCase() === resetEmail.trim().toLowerCase()) || 
         (u.contact && u.contact === resetEmail.trim())
       );
-
       if (userIndex > -1) {
         users[userIndex].password = newPassword; 
         await AsyncStorage.setItem('registered_users', JSON.stringify(users));
-        Alert.alert("SUCCESS", "Password updated successfully. You can now login.");
+        Alert.alert("SUCCESS", "Password updated successfully.");
         setResetModal(false);
-        setResetEmail("");
-        setNewPassword("");
       } else {
-        Alert.alert("NOT FOUND", "User record not found in system.");
+        Alert.alert("NOT FOUND", "User record not found.");
       }
-    } catch (e) {
-      Alert.alert("SYSTEM ERROR", "Unable to update credentials.");
-    }
+    } catch (e) { Alert.alert("SYSTEM ERROR", "Unable to update."); }
   };
 
-  // --- ANIMATIONS ---
   useEffect(() => {
     if (Platform.OS === 'web') {
       const handleMouseMove = (event) => {
@@ -149,180 +156,153 @@ export default function LoginScreen({ navigation }) {
       };
       window.addEventListener('mousemove', handleMouseMove);
       return () => window.removeEventListener('mousemove', handleMouseMove);
-    } else {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(floatAnim, { toValue: -15, duration: 2500, useNativeDriver: true }),
-          Animated.timing(floatAnim, { toValue: 15, duration: 2500, useNativeDriver: true }),
-        ])
-      ).start();
     }
   }, []);
-
-  const animatedImageStyle = {
-    transform: [
-      { perspective: 1000 },
-      { rotateX: Platform.OS === 'web' ? rotateX.interpolate({ inputRange: [-20, 20], outputRange: ['-20deg', '20deg'] }) : '0deg' },
-      { rotateY: Platform.OS === 'web' ? rotateY.interpolate({ inputRange: [-30, 30], outputRange: ['-30deg', '30deg'] }) : '0deg' },
-      { translateY: Platform.OS !== 'web' ? floatAnim : 0 }
-    ],
-  };
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <StatusBar barStyle="light-content" />
       <View style={styles.mainContainer}>
         
-        {/* RESET MODAL */}
-        <Modal transparent visible={resetModal} animationType="slide">
+        <Modal transparent visible={resetModal} animationType="fade">
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>SYSTEM RECOVERY</Text>
-              <Text style={styles.subText}>Enter your details to reset password</Text>
-              
-              <View style={[styles.fieldGroup, { width: '100%', marginTop: 20 }]}>
-                <Text style={styles.fieldLabel}>Confirm Email/Phone</Text>
-                <TextInput 
-                  placeholder="UserID / Contact No." 
-                  style={styles.fieldInput} 
-                  onChangeText={setResetEmail}
-                  placeholderTextColor="#94a3b8"
-                />
-              </View>
-              
-              <View style={[styles.fieldGroup, { width: '100%' }]}>
-                <Text style={styles.fieldLabel}>New Password</Text>
-                <TextInput 
-                  placeholder="••••••••" 
-                  secureTextEntry 
-                  style={styles.fieldInput} 
-                  onChangeText={setNewPassword}
-                  placeholderTextColor="#94a3b8"
-                />
-              </View>
-
+              <Text style={styles.modalTitle}>RECOVERY MODE</Text>
+              <TextInput placeholder="Email/Phone" style={styles.modalInput} onChangeText={setResetEmail} placeholderTextColor="#475569" />
+              <TextInput placeholder="New Password" secureTextEntry style={styles.modalInput} onChangeText={setNewPassword} placeholderTextColor="#475569" />
               <TouchableOpacity style={styles.executeBtn} onPress={handleResetPassword}>
-                <Text style={styles.btnText}>RESET CREDENTIALS</Text>
+                <Text style={styles.btnText}>RESET</Text>
               </TouchableOpacity>
-
-              <TouchableOpacity onPress={() => setResetModal(false)} style={{ marginTop: 20 }}>
-                <Text style={{ color: '#ef4444', fontWeight: '900', fontSize: 11, letterSpacing: 1 }}>CANCEL</Text>
-              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setResetModal(false)}><Text style={{color:'#ef4444', marginTop:15}}>CLOSE</Text></TouchableOpacity>
             </View>
           </View>
         </Modal>
 
-        <View style={styles.formSection}>
-          <View style={styles.authCard}>
-            <View style={styles.statusBadge}><Text style={styles.badgeText}>USER ACCESS</Text></View>
-            <Text style={styles.mainTitle}>EXAM<Text style={{color: '#6366f1'}}>READINESS</Text></Text>
-            <Text style={styles.subText}>Train your mind, success will follow.</Text>
+        <View style={styles.contentCard}>
+          <View style={styles.formSection}>
+            <View style={styles.authCard}>
+              <View style={styles.statusBadge}><Text style={styles.badgeText}>USER ACCESS</Text></View>
+              <Text style={styles.mainTitle}>EXAM<Text style={{color: '#a855f7'}}>READINESS</Text></Text>
+              <Text style={styles.subText}>Train your mind, success will follow.</Text>
 
-            <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Email or Phone</Text>
-              <TextInput 
-                placeholder="User ID / Contact No." 
-                onChangeText={(text) => { setEmail(text); setEmailError(""); }} 
-                style={[styles.fieldInput, emailError ? styles.errorBorder : null]} 
-                placeholderTextColor="#94a3b8" 
-              />
-              {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
-            </View>
-
-            <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Password</Text>
-              <View style={[styles.passInputWrapper, passwordError ? styles.errorBorder : null]}>
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Email or Phone</Text>
                 <TextInput 
-                    placeholder="••••••••••••••••" 
-                    secureTextEntry={!showPassword} 
-                    onChangeText={(text) => { setPassword(text); setPasswordError(""); }} 
-                    style={styles.passInput} 
-                    placeholderTextColor="#94a3b8" 
+                  placeholder="@hcdc.edu.ph / Contact No." 
+                  onChangeText={(text) => { setEmail(text); setEmailError(""); }} 
+                  style={[styles.fieldInput, emailError ? styles.errorBorder : null]} 
+                  placeholderTextColor="#94a3b8"
+                  returnKeyType="next"
                 />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.iconPadding}>
-                  <Ionicons name={showPassword ? "eye-off" : "eye"} size={18} color="#6366f1" />
+                {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
+              </View>
+
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Password</Text>
+                <View style={[styles.passInputWrapper, passwordError ? styles.errorBorder : null]}>
+                  <TextInput 
+                      placeholder="••••••••••••••••" 
+                      secureTextEntry={!showPassword} 
+                      onChangeText={(text) => { setPassword(text); setPasswordError(""); }} 
+                      style={styles.passInput} 
+                      placeholderTextColor="#94a3b8" 
+                      returnKeyType="done"
+                      onSubmitEditing={handleLogin}
+                  />
+                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.iconPadding}>
+                    <Ionicons name={showPassword ? "eye-off" : "eye"} size={18} color="#a855f7" />
+                  </TouchableOpacity>
+                </View>
+                {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
+              </View>
+
+              <TouchableOpacity onPress={() => setResetModal(true)} style={styles.forgotBtn}>
+                <Text style={styles.forgotText}>Forgot Password?</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.executeBtn} onPress={handleLogin}>
+                  <Text style={styles.btnText}>LOG IN NOW</Text>
+              </TouchableOpacity>
+
+              <View style={styles.dividerRow}>
+                <View style={styles.dividerLine} /><Text style={styles.orText}>OR</Text><View style={styles.dividerLine} />
+              </View>
+
+              <View style={styles.socialRow}>
+                <TouchableOpacity onPress={() => googlePromptAsync()} style={styles.socialBox}>
+                  <Ionicons name="logo-google" size={20} color="#ea4335" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => fbPromptAsync()} style={styles.socialBox}>
+                  <FontAwesome name="facebook" size={20} color="#1877f2" />
                 </TouchableOpacity>
               </View>
-              {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
-            </View>
 
-            {/* FORGOT PASSWORD LINK */}
-            <TouchableOpacity onPress={() => setResetModal(true)} style={{ alignSelf: 'flex-end', marginTop: -10, marginBottom: 15 }}>
-              <Text style={{ color: '#6366f1', fontSize: 11, fontWeight: '800' }}>Forgot Password?</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.executeBtn} onPress={handleLogin}>
-                <Text style={styles.btnText}>LOG IN NOW</Text>
-            </TouchableOpacity>
-
-            <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} /><Text style={styles.orText}>OR</Text><View style={styles.dividerLine} />
-            </View>
-
-            <View style={styles.socialRow}>
-              <TouchableOpacity onPress={() => googlePromptAsync()} style={styles.socialBox}>
-                <Ionicons name="logo-google" size={22} color="#ea4335" />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => fbPromptAsync()} style={styles.socialBox}>
-                <FontAwesome name="facebook" size={22} color="#1877f2" />
+              <TouchableOpacity 
+                  onPress={() => navigation.navigate("SignUp")} 
+                  style={styles.bottomLink}
+              >
+                <Text style={styles.linkText}>New user? <Text style={styles.linkHighlight}>Create Account</Text></Text>
               </TouchableOpacity>
             </View>
-
-            <TouchableOpacity onPress={() => navigation.navigate("SignUp")} style={styles.bottomLink}>
-              <Text style={styles.linkText}>New user? <Text style={styles.linkHighlight}>Create Account</Text></Text>
-            </TouchableOpacity>
           </View>
+
+          {(Platform.OS === 'web' || SCREEN_WIDTH > 800) && (
+            <View style={styles.visualSection}>
+              <View style={styles.glow1} />
+              <Animated.View style={{
+                transform: [
+                  { perspective: 1000 },
+                  { rotateX: Platform.OS === 'web' ? rotateX.interpolate({ inputRange: [-20, 20], outputRange: ['-20deg', '20deg'] }) : '0deg' },
+                  { rotateY: Platform.OS === 'web' ? rotateY.interpolate({ inputRange: [-30, 30], outputRange: ['-30deg', '30deg'] }) : '0deg' },
+                ],
+              }}>
+                <Image source={require("../assets/ai-student.png")} style={styles.visualImg} />
+              </Animated.View>
+              <View style={styles.floatingInfo}><Text style={styles.infoText}>LOGIN NODE: SECURE</Text></View>
+            </View>
+          )}
         </View>
-
-        {Platform.OS === 'web' || SCREEN_WIDTH > 800 ? (
-          <View style={styles.visualSection}>
-            <View style={styles.glow1} /><View style={styles.glow2} />
-            <Animated.View style={animatedImageStyle}>
-              <Image source={require("../assets/ai-student.png")} style={styles.visualImg} />
-            </Animated.View>
-            <View style={styles.floatingInfo}><Text style={styles.infoText}>SECURE LOGIN NODE</Text></View>
-          </View>
-        ) : null}
-
       </View>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  mainContainer: { flex: 1, flexDirection: 'row', backgroundColor: '#020617' },
-  formSection: { flex: 1, justifyContent: 'center', paddingHorizontal: '10%' },
-  authCard: { width: '100%', maxWidth: 400 },
-  statusBadge: { backgroundColor: 'rgba(99, 102, 241, 0.1)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 4, alignSelf: 'flex-start', borderWidth: 1, borderColor: 'rgba(99, 102, 241, 0.3)', marginBottom: 20 },
-  badgeText: { color: '#6366f1', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  mainTitle: { fontSize: 42, fontWeight: '900', color: '#fff', letterSpacing: -1 },
-  subText: { color: '#475569', fontSize: 14, marginTop: 8, marginBottom: 40 },
-  fieldGroup: { marginBottom: 20 },
-  fieldLabel: { color: '#6366f1', fontSize: 11, fontWeight: '700', marginBottom: 8, textTransform: 'uppercase' },
-  fieldInput: { backgroundColor: '#eff6ff', height: 55, borderRadius: 12, paddingHorizontal: 20, color: '#1e293b', fontSize: 15, fontWeight: '500' },
+  mainContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  contentCard: { flexDirection: 'row', width: '100%', maxWidth: 1000, height: 650, backgroundColor: '#020617', borderRadius: 30, borderWidth: 1, borderColor: 'rgba(168, 85, 247, 0.2)', overflow: 'hidden', shadowColor: "#a855f7", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 30, elevation: 10 },
+  formSection: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+  authCard: { width: '100%', maxWidth: 350 },
+  statusBadge: { backgroundColor: 'rgba(168, 85, 247, 0.1)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 4, alignSelf: 'flex-start', borderWidth: 1, borderColor: 'rgba(168, 85, 247, 0.3)', marginBottom: 15 },
+  badgeText: { color: '#a855f7', fontSize: 9, fontWeight: '800', letterSpacing: 1 },
+  mainTitle: { fontSize: 32, fontWeight: '900', color: '#fff', letterSpacing: -1 },
+  subText: { color: '#475569', fontSize: 13, marginTop: 5, marginBottom: 30 },
+  fieldGroup: { marginBottom: 15 },
+  fieldLabel: { color: '#a855f7', fontSize: 10, fontWeight: '700', marginBottom: 8, textTransform: 'uppercase' },
+  fieldInput: { backgroundColor: '#eff6ff', height: 50, borderRadius: 12, paddingHorizontal: 15, color: '#1e293b', fontSize: 14 },
   passInputWrapper: { flexDirection: 'row', backgroundColor: '#eff6ff', borderRadius: 12, alignItems: 'center' },
-  passInput: { flex: 1, height: 55, paddingHorizontal: 20, color: '#1e293b' },
-  iconPadding: { paddingRight: 20 },
-  executeBtn: { backgroundColor: '#6366f1', width: '100%', height: 55, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginTop: 20 },
-  btnText: { color: '#fff', fontSize: 14, fontWeight: '900', letterSpacing: 1 },
-  dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 30 },
+  passInput: { flex: 1, height: 50, paddingHorizontal: 15, color: '#1e293b' },
+  iconPadding: { paddingRight: 15 },
+  forgotBtn: { alignSelf: 'flex-end', marginTop: -5, marginBottom: 15 },
+  forgotText: { color: '#a855f7', fontSize: 11, fontWeight: '800' },
+  executeBtn: { backgroundColor: '#a855f7', width: '100%', height: 50, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  btnText: { color: '#fff', fontSize: 13, fontWeight: '900', letterSpacing: 1 },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 20 },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#1e293b' },
-  orText: { color: '#475569', marginHorizontal: 15, fontSize: 10, fontWeight: '700' },
-  socialRow: { flexDirection: 'row', justifyContent: 'center', gap: 15, marginBottom: 30 },
-  socialBox: { width: 120, height: 55, backgroundColor: '#0f172a', borderRadius: 12, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#1e293b' },
-  bottomLink: { alignItems: 'center' },
-  linkText: { color: '#475569', fontSize: 13 },
-  linkHighlight: { color: '#6366f1', fontWeight: '700' },
-  visualSection: { flex: 1.2, backgroundColor: '#0f172a', justifyContent: 'center', alignItems: 'center', position: 'relative', overflow: 'hidden' },
-  visualImg: { width: SCREEN_WIDTH * 0.35, height: SCREEN_WIDTH * 0.35, resizeMode: 'contain' },
-  glow1: { position: 'absolute', width: 500, height: 500, borderRadius: 250, backgroundColor: 'rgba(99, 102, 241, 0.05)', top: -100, right: -100 },
-  glow2: { position: 'absolute', width: 400, height: 400, borderRadius: 200, backgroundColor: 'rgba(99, 102, 241, 0.03)', bottom: -50, left: -50 },
-  floatingInfo: { position: 'absolute', bottom: 40, right: 40, paddingHorizontal: 15, paddingVertical: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 8, borderWidth: 1, borderColor: '#1e293b' },
-  infoText: { color: '#6366f1', fontSize: 10, fontWeight: '800' },
-  errorText: { color: '#ef4444', fontSize: 10, marginTop: 5, fontWeight: '700' },
+  orText: { color: '#475569', marginHorizontal: 10, fontSize: 10, fontWeight: '700' },
+  socialRow: { flexDirection: 'row', justifyContent: 'center', gap: 12, marginBottom: 20 },
+  socialBox: { width: 80, height: 45, backgroundColor: '#0f172a', borderRadius: 10, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#1e293b' },
+  bottomLink: { alignItems: 'center', marginTop: 10 },
+  linkText: { color: '#475569', fontSize: 12 },
+  linkHighlight: { color: '#a855f7', fontWeight: '800' },
+  visualSection: { flex: 1.2, backgroundColor: '#010409', justifyContent: 'center', alignItems: 'center', borderLeftWidth: 1, borderLeftColor: 'rgba(255,255,255,0.05)' },
+  visualImg: { width: 500, height: 500, resizeMode: 'contain' },
+  glow1: { position: 'absolute', width: 400, height: 400, borderRadius: 200, backgroundColor: 'rgba(168, 85, 247, 0.05)' },
+  floatingInfo: { position: 'absolute', bottom: 30, right: 30, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 8, borderWidth: 1, borderColor: '#1e293b' },
+  infoText: { color: '#a855f7', fontSize: 9, fontWeight: '800' },
+  errorText: { color: '#ef4444', fontSize: 9, marginTop: 4, fontWeight: '700' },
   errorBorder: { borderWidth: 1.5, borderColor: '#ef4444' },
-  // RECOVERY MODAL STYLES
   modalOverlay: { flex: 1, backgroundColor: 'rgba(2, 6, 23, 0.95)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { width: '90%', maxWidth: 400, backgroundColor: '#0f172a', padding: 30, borderRadius: 30, borderWidth: 1, borderColor: 'rgba(99, 102, 241, 0.3)', alignItems: 'center' },
-  modalTitle: { color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: 2 }
+  modalContent: { width: '90%', maxWidth: 350, backgroundColor: '#0f172a', padding: 25, borderRadius: 25, alignItems: 'center' },
+  modalTitle: { color: '#fff', fontSize: 16, fontWeight: '900', marginBottom: 20 },
+  modalInput: { width: '100%', height: 45, backgroundColor: '#eff6ff', borderRadius: 10, paddingHorizontal: 15, marginBottom: 15 }
 });

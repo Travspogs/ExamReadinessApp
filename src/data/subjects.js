@@ -3,6 +3,6 @@ export const subjects = [
   "English",
   "Science",
   "Filipino",
-  "Computer Science",
-  "History"
+  "Computer_Science", // <-- Siguraduhing may comma dito pagkatapos ng "Filipino"
+  "History"           // <-- Line 7 mo ay malamang nandito o sa dulo nito
 ];
