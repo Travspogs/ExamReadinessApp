@@ -1,15 +1,19 @@
 import {
+  Platform,
   SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View
 } from "react-native";
 
 export default function ReviewScreen({ route, navigation }) {
   const { wrongAnswers = [] } = route.params || {};
+  const { width: SCREEN_WIDTH } = useWindowDimensions();
+  const isWeb = Platform.OS === 'web';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -29,13 +33,18 @@ export default function ReviewScreen({ route, navigation }) {
           <Text style={styles.headerSub}>REVIEW MODE</Text>
         </View>
 
+        {/* Placeholder para sa alignment */}
         <View style={{ width: 35 }} />
       </View>
 
       {/* CONTENT */}
       <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={isWeb}
+        contentContainerStyle={[
+          styles.scrollContent,
+          // Sa web, nagdadagdag tayo ng padding sa gilid para maganda tignan
+          isWeb && { paddingHorizontal: SCREEN_WIDTH > 800 ? (SCREEN_WIDTH - 800) / 2 : 20 }
+        ]}
       >
         <Text style={styles.summaryText}>
           RESULT REVIEW: {wrongAnswers.length}
@@ -61,12 +70,12 @@ export default function ReviewScreen({ route, navigation }) {
               {/* QUESTION */}
               <Text style={styles.questionText}>{item.question}</Text>
 
-              {/* ANSWERS SECTION - Side by Side para hindi mahaba */}
+              {/* ANSWERS SECTION - Side by Side layout */}
               <View style={styles.answerSectionRow}>
                 {/* USER ANSWER */}
                 <View style={[styles.userAnswerBox, styles.flex1]}>
                   <Text style={styles.label}>USER INPUT</Text>
-                  <Text style={styles.userValue} numberOfLines={2}>
+                  <Text style={styles.userValue} numberOfLines={3}>
                     {item.userAnswer || "N/A"}
                   </Text>
                 </View>
@@ -74,7 +83,7 @@ export default function ReviewScreen({ route, navigation }) {
                 {/* CORRECT ANSWER */}
                 <View style={[styles.correctAnswerBox, styles.flex1]}>
                   <Text style={styles.labelActive}>CORRECT</Text>
-                  <Text style={styles.correctValue} numberOfLines={2}>
+                  <Text style={styles.correctValue} numberOfLines={3}>
                     {item.answer || "N/A"}
                   </Text>
                 </View>
@@ -101,10 +110,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingVertical: 15, // Compact header
+    paddingVertical: 15,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(99, 102, 241, 0.2)",
     backgroundColor: "#0B0F19",
+    // Para sa Web header shadow
+    ...Platform.select({
+      web: {
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
+      }
+    })
   },
   backButton: {
     width: 35,
@@ -129,16 +146,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "900",
     letterSpacing: 2,
+    textAlign: 'center',
   },
   headerSub: {
     color: "#6366f1",
     fontSize: 9,
     fontWeight: "800",
     letterSpacing: 1,
+    textAlign: 'center',
   },
   scrollContent: {
     padding: 16,
-    alignItems: "center", // I-center ang mga cards
+    alignItems: "center",
   },
   summaryText: {
     color: "#94a3b8",
@@ -156,7 +175,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.06)",
     width: "100%",
-    maxWidth: 500, // Limit sa lapad para hindi stretched
+    maxWidth: 600, // Slightly wider for better readability on web
+    ...Platform.select({
+      web: {
+        transition: 'transform 0.2s ease',
+        cursor: 'default',
+      }
+    })
   },
   qHeader: {
     flexDirection: "row",
@@ -185,10 +210,9 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 15,
     fontWeight: "600",
-    lineHeight: 20,
+    lineHeight: 22,
     marginBottom: 15,
   },
-  /* NEW ROW LAYOUT */
   answerSectionRow: {
     flexDirection: "row",
     gap: 10,
@@ -202,7 +226,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(239, 68, 68, 0.05)",
     borderWidth: 1,
     borderColor: "rgba(239, 68, 68, 0.2)",
-    minHeight: 60, // Pantay na height
+    minHeight: 80,
   },
   correctAnswerBox: {
     padding: 12,
@@ -210,7 +234,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(16, 185, 129, 0.05)",
     borderWidth: 1,
     borderColor: "rgba(16, 185, 129, 0.2)",
-    minHeight: 60, // Pantay na height
+    minHeight: 80,
   },
   label: {
     fontSize: 8,
@@ -218,6 +242,7 @@ const styles = StyleSheet.create({
     color: "#ef4444",
     marginBottom: 4,
     letterSpacing: 1,
+    textTransform: 'uppercase'
   },
   labelActive: {
     fontSize: 8,
@@ -225,6 +250,7 @@ const styles = StyleSheet.create({
     color: "#10b981",
     marginBottom: 4,
     letterSpacing: 1,
+    textTransform: 'uppercase'
   },
   userValue: {
     color: "#fca5a5",

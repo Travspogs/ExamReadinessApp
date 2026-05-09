@@ -1,15 +1,23 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from "react";
-import { Dimensions, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View
+} from "react-native";
 import { StorageService } from "../utils/storageService";
-
-const { width } = Dimensions.get("window");
 
 export default function LeaderboardScreen({ navigation }) {
   const [rankings, setRankings] = useState([]);
+  const { width: SCREEN_WIDTH } = useWindowDimensions();
+  const isWeb = Platform.OS === 'web';
 
   useEffect(() => {
-    // Mahalaga ito: Nagre-refresh ang data tuwing papasok sa screen
     const unsubscribe = navigation.addListener('focus', () => {
       loadGlobalRankings();
     });
@@ -18,12 +26,9 @@ export default function LeaderboardScreen({ navigation }) {
 
   const loadGlobalRankings = async () => {
     try {
-      // 1. Dito manggagaling ang isolation. 
-      // StorageService.getResults() na ngayon ay unique per account.
       const logs = await StorageService.getResults(); 
       let myTotalPoints = 0;
       
-      // Kung bago ang account, logs.length ay magiging 0, kaya myTotalPoints ay 0.
       if (logs && logs.length > 0) {
         myTotalPoints = logs.reduce((sum, log) => sum + Math.round(log.score), 0);
       }
@@ -38,7 +43,6 @@ export default function LeaderboardScreen({ navigation }) {
         isMe: true 
       };
 
-      // 2. MOCK DATA (Laging andyan para may kumpetisyon)
       const mockUsers = [
         { username: "CYBER_GHOST", totalPoints: 850, rank: "DIAMOND", isMe: false },
         { username: "ROOT_ADMIN", totalPoints: 620, rank: "PLATINUM", isMe: false },
@@ -46,7 +50,6 @@ export default function LeaderboardScreen({ navigation }) {
         { username: "X_PROTOCOL", totalPoints: 150, rank: "BRONZE", isMe: false },
       ];
 
-      // Pagsamahin at i-sort. Kung 0 points ka (bagong account), nasa huli ka.
       const combinedList = [...mockUsers, myData].sort((a, b) => b.totalPoints - a.totalPoints);
       setRankings(combinedList);
 
@@ -57,16 +60,22 @@ export default function LeaderboardScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* ADAPTIVE HEADER */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtnWrapper}>
-          <Text style={styles.backBtnText}>◄ BACK</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>OVERALL<Text style={{color: '#a855f7'}}> RANKINGS</Text></Text>
-        <View style={{width: 60}} />
+        <View style={[styles.headerInner, isWeb && { maxWidth: 800, alignSelf: 'center' }]}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtnWrapper}>
+            <Text style={styles.backBtnText}>◄ BACK</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>OVERALL<Text style={{color: '#a855f7'}}> RANKINGS</Text></Text>
+            <View style={{width: 60}} />
+        </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollPadding} showsVerticalScrollIndicator={false}>
-        <View style={styles.mainWrapper}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollPadding} 
+        showsVerticalScrollIndicator={isWeb}
+      >
+        <View style={[styles.mainWrapper, isWeb && { maxWidth: 600 }]}>
           <Text style={styles.sectionLabel}>PERFORMANCE LEADERBOARD</Text>
           
           {rankings.map((user, index) => (
@@ -103,20 +112,43 @@ export default function LeaderboardScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#02040d" },
   header: { 
-    flexDirection: "row", justifyContent: "space-between", 
-    paddingHorizontal: 20, paddingTop: 50, paddingBottom: 15,
-    alignItems: "center", backgroundColor: '#02040d' 
+    backgroundColor: '#02040d',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+    ...Platform.select({
+      web: { position: 'sticky', top: 0, zIndex: 10 }
+    })
+  },
+  headerInner: {
+    flexDirection: "row", 
+    justifyContent: "space-between", 
+    width: '100%',
+    paddingHorizontal: 20, 
+    paddingTop: Platform.OS === 'ios' ? 10 : 50, 
+    paddingBottom: 15,
+    alignItems: "center",
   },
   backBtnWrapper: { paddingVertical: 5 },
   backBtnText: { color: "#6366f1", fontWeight: "900", fontSize: 12, letterSpacing: 1 },
   title: { color: "#fff", fontSize: 16, fontWeight: "900", letterSpacing: 2 },
   scrollPadding: { paddingVertical: 25, alignItems: 'center' },
-  mainWrapper: { width: '100%', maxWidth: 450, paddingHorizontal: 20 },
+  mainWrapper: { width: '100%', paddingHorizontal: 20 },
   sectionLabel: { color: "#475569", fontSize: 9, fontWeight: "900", letterSpacing: 1.5, marginBottom: 20 },
   rankCard: { 
-    flexDirection: 'row', backgroundColor: '#0b0c14', 
-    padding: 16, borderRadius: 18, marginBottom: 12, 
-    alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)'
+    flexDirection: 'row', 
+    backgroundColor: '#0b0c14', 
+    padding: 16, 
+    borderRadius: 18, 
+    marginBottom: 12, 
+    alignItems: 'center', 
+    borderWidth: 1, 
+    borderColor: 'rgba(255,255,255,0.05)',
+    ...Platform.select({
+        web: {
+            transition: 'transform 0.2s ease',
+            cursor: 'default'
+        }
+    })
   },
   myRankCard: {
     borderColor: '#6366f180',

@@ -6,7 +6,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
   FlatList,
   Image,
   Modal,
@@ -18,13 +17,19 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  useWindowDimensions
 } from "react-native";
 import { StorageService } from "../utils/storageService";
 
-const { width } = Dimensions.get('window');
+// ASSETS
+const BRAIN_ICON = require('../assets/assets/brain_bg.jpg'); 
 
 export default function HomeScreen({ navigation }) {
+  const { width: windowWidth } = useWindowDimensions();
+  const isWeb = Platform.OS === 'web';
+  const isLargeScreen = windowWidth > 768;
+
   const [readinessText, setReadinessText] = useState("");
   const [subjectProgress, setSubjectProgress] = useState({});
   const [userName, setUserName] = useState("STUDENT");
@@ -34,15 +39,13 @@ export default function HomeScreen({ navigation }) {
   const [address, setAddress] = useState("");
   const [birthday, setBirthday] = useState("");
   const [gender, setGender] = useState("");
-  const [tempPassword, setTempPassword] = useState("");
   const [showProfile, setShowProfile] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState("");
   const [showSelector, setShowSelector] = useState(false);
   const [isSystemLoading, setIsSystemLoading] = useState(false);
 
-  // Original Subjects Config - COLORS UNCHANGED
   const subjectsConfig = [
-    { name: "Mathematics", color: "#6366f1", icon: "∑" }, 
+    { name: "Mathematics", color: "#00d2ff", icon: "∑" }, 
     { name: "English", color: "#a855f7", icon: "A" },      
     { name: "Science", color: "#3b82f6", icon: "⚛" },      
     { name: "Filipino", color: "#ec4899", icon: "F" },     
@@ -95,10 +98,12 @@ export default function HomeScreen({ navigation }) {
   };
 
   const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('PERMISSION DENIED', 'Access to gallery is required.');
-      return;
+    if (!isWeb) {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('PERMISSION DENIED', 'Access to gallery is required.');
+          return;
+        }
     }
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -132,11 +137,11 @@ export default function HomeScreen({ navigation }) {
           user.fullName = userName;
           await AsyncStorage.setItem('current_user', JSON.stringify(user));
         }
-        Alert.alert("SYSTEM UPDATE", "Profile credentials synchronized successfully.");
+        
+        if (isWeb) { window.alert("SYSTEM UPDATE: Profile credentials synchronized."); }
+        else { Alert.alert("SYSTEM UPDATE", "Profile credentials synchronized."); }
         setShowProfile(false);
-    } catch (e) {
-        Alert.alert("SAVE ERROR", "Failed to update profile data.");
-    }
+    } catch (e) { Alert.alert("SAVE ERROR", "Failed to update profile data."); }
   };
 
   const openDifficultySelector = (subject) => {
@@ -170,14 +175,14 @@ export default function HomeScreen({ navigation }) {
 
   const getActiveSubjectColor = () => {
     const subject = subjectsConfig.find(s => s.name === selectedSubject);
-    return subject ? subject.color : "#6366f1"; // Indigo Default
+    return subject ? subject.color : "#6366f1"; 
   };
 
   useFocusEffect(useCallback(() => { loadUserData(); }, [userEmail]));
 
   useEffect(() => {
     let index = 0;
-    const fullDesc = `Welcome, ${userName}. Academic modules synchronized. Readiness level: HIGH. System ready for challenge.`;
+    const fullDesc = `Welcome, ${userName}. Academic modules synchronized, readiness level HIGH. System ready for challenges.`;
     setReadinessText(""); 
     const interval = setInterval(() => {
       setReadinessText(fullDesc.slice(0, index));
@@ -198,7 +203,7 @@ export default function HomeScreen({ navigation }) {
       return <Image source={source} style={avatarStyle} key={profileImage.toString()} />;
     }
     return (
-      <View style={[avatarStyle, { backgroundColor: 'rgba(99, 102, 241, 0.1)' }]}>
+      <View style={[avatarStyle, { backgroundColor: 'rgba(0, 210, 255, 0.1)' }]}>
         <Text style={textStyle}>{userName ? userName.charAt(0) : 'S'}</Text>
       </View>
     );
@@ -207,8 +212,11 @@ export default function HomeScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      <LinearGradient colors={['#020617', '#020617', '#1e1b4b', '#020617']} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={['#020617', '#0f172a', '#020617']} style={StyleSheet.absoluteFill} />
       
+      <View style={[styles.bgOrb, { top: '10%', left: '5%', backgroundColor: '#a855f720' }]} />
+      <View style={[styles.bgOrb, { bottom: '15%', right: '5%', backgroundColor: '#00d2ff20' }]} />
+
       {isSystemLoading && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color={getActiveSubjectColor()} />
@@ -216,48 +224,39 @@ export default function HomeScreen({ navigation }) {
         </View>
       )}
 
-      {/* PROFILE MODAL - Indigo Accent */}
+      {/* Profile Modal */}
       <Modal transparent visible={showProfile} animationType="fade">
         <View style={styles.modalContainer}>
-          <View style={[styles.modalContent, { height: '90%', width: '92%' }]}>
-             <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>USER PROFILE</Text>
-                <View style={styles.titleDivider} />
-             </View>
-            
+          <View style={[styles.modalContent, isWeb && { maxWidth: 500 }]}>
+              <View style={styles.modalHeader}>
+                 <Text style={styles.modalTitle}>USER PROFILE</Text>
+                 <View style={styles.titleDivider} />
+              </View>
             <TouchableOpacity onPress={pickImage} style={styles.mainAvatarContainerLarge}>
                 <RenderAvatar size="extraLarge" />
                 <View style={styles.editBadgeLarge}><Text style={styles.editBadgeText}>EDIT IMAGE</Text></View>
             </TouchableOpacity>
-
             <ScrollView style={{ width: '100%' }} showsVerticalScrollIndicator={false}>
               <View style={styles.settingsGroup}>
                 <View style={styles.inputWrapper}>
                   <Text style={styles.inputLabel}>FULL NAME</Text>
-                  <TextInput style={styles.profileInput} value={userName} onChangeText={(val) => setUserName(val.toUpperCase())} placeholderTextColor="rgba(255,255,255,0.2)"/>
+                  <TextInput style={styles.profileInput} value={userName} onChangeText={(val) => setUserName(val.toUpperCase())} />
                 </View>
                 <View style={styles.inputWrapper}>
                   <Text style={styles.inputLabel}>ADDRESS</Text>
-                  <TextInput style={styles.profileInput} value={address} onChangeText={setAddress} placeholder="Location" placeholderTextColor="rgba(255,255,255,0.2)"/>
+                  <TextInput style={styles.profileInput} value={address} onChangeText={setAddress} placeholder="Location" placeholderTextColor="#475569"/>
                 </View>
                 <View style={styles.inputWrapper}>
                   <Text style={styles.inputLabel}>BIRTHDAY</Text>
-                  <TextInput style={styles.profileInput} value={birthday} onChangeText={setBirthday} placeholder="MM/DD/YYYY" placeholderTextColor="rgba(255,255,255,0.2)"/>
+                  <TextInput style={styles.profileInput} value={birthday} onChangeText={setBirthday} placeholder="MM/DD/YYYY" placeholderTextColor="#475569"/>
                 </View>
                 <View style={styles.inputWrapper}>
                   <Text style={styles.inputLabel}>GENDER</Text>
-                  <TextInput style={styles.profileInput} value={gender} onChangeText={setGender} placeholder="Select" placeholderTextColor="rgba(255,255,255,0.2)"/>
+                  <TextInput style={styles.profileInput} value={gender} onChangeText={setGender} placeholder="Select" placeholderTextColor="#475569"/>
                 </View>
-                <View style={styles.inputWrapper}>
-                  <Text style={styles.inputLabel}>PASSWORD</Text>
-                  <TextInput style={styles.profileInput} value={tempPassword} onChangeText={setTempPassword} placeholder="••••••••" secureTextEntry placeholderTextColor="rgba(255,255,255,0.2)"/>
-                </View>
-                
                 <Text style={styles.settingLabel}>SYSTEM AVATARS</Text>
                 <FlatList
-                  data={presetAvatars}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
+                  data={presetAvatars} horizontal
                   keyExtractor={(_, index) => index.toString()}
                   contentContainerStyle={{ gap: 12, paddingVertical: 10 }}
                   renderItem={({ item, index }) => (
@@ -268,7 +267,6 @@ export default function HomeScreen({ navigation }) {
                 />
               </View>
             </ScrollView>
-
             <View style={styles.modalFooterActions}>
               <TouchableOpacity onPress={handleSaveProfile} style={styles.saveBtn}>
                 <Text style={styles.actionBtnText}>SAVE CREDENTIALS</Text>
@@ -281,10 +279,10 @@ export default function HomeScreen({ navigation }) {
         </View>
       </Modal>
 
-      {/* DIFFICULTY MODAL - Subject Accent */}
+      {/* Protocol Selector Modal */}
       <Modal transparent visible={showSelector} animationType="fade">
         <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, isWeb && { maxWidth: 400 }]}>
             <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>PROTOCOL SELECTOR</Text>
                 <Text style={styles.modalSub}>{selectedSubject.toUpperCase()}</Text>
@@ -306,7 +304,7 @@ export default function HomeScreen({ navigation }) {
       </Modal>
 
       <SafeAreaView style={{ flex: 1 }}>
-        {/* HEADER SECTION */}
+        {/* Header Section */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => setShowProfile(true)} style={styles.headerLeft}>
             <View>
@@ -314,7 +312,7 @@ export default function HomeScreen({ navigation }) {
                 <View style={styles.onlineDot} />
             </View>
             <View>
-              <Text style={styles.nodeText}>SYSTEM ACCESS: <Text style={{color: '#6366f1'}}>{userName}</Text></Text>
+              <Text style={styles.nodeText}>SYSTEM ACCESS: <Text style={{color: '#00d2ff'}}>{userName}</Text></Text>
               <Text style={styles.title}>EXAM<Text style={{color: '#a855f7'}}>READINESS</Text></Text>
             </View>
           </TouchableOpacity>
@@ -324,50 +322,69 @@ export default function HomeScreen({ navigation }) {
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollPadding}>
-          <View style={styles.mainWrapper}>
+          <View style={[styles.mainWrapper, isWeb && { maxWidth: 1000 }]}>
               
-              {/* HERO CARD - Card Layout Inspired by image but colors are yours */}
-              <View style={styles.heroCard}>
-                  <View style={styles.heroTop}>
-                      <Text style={styles.heroLabel}>CORE PROTOCOL</Text>
-                      <TouchableOpacity style={styles.insightBtn} onPress={() => navigation.navigate("Insights")}>
-                          <Text style={styles.insightBtnText}>VIEW INSIGHTS</Text>
-                      </TouchableOpacity>
+              {/* Hero Section */}
+              <View style={[styles.heroGlassContainer, isLargeScreen && { flexDirection: 'row', alignItems: 'center' }]}>
+                <View style={[styles.heroTextContent, isLargeScreen && { flex: 1 }]}>
+                    <Text style={styles.heroLabel}>CORE PROTOCOL</Text>
+                    <Text style={styles.heroTitle}>The Future of Exam Readiness Is Here</Text>
+                    <Text style={styles.typingText}>{readinessText}</Text>
+                    
+                    <TouchableOpacity style={styles.insightBtnHero} onPress={() => navigation.navigate("Insights")}>
+                        <Text style={styles.insightBtnTextHero}>VIEW INSIGHTS</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {isLargeScreen && (
+                  <View style={styles.heroVisualContent}>
+                     <View style={styles.visualBrainContainer}>
+                        {/* UPDATE: Full-sized brain icon, square overlay removed */}
+                        <Image source={BRAIN_ICON} style={styles.visualIconBrain} resizeMode="contain" />
+                     </View>
                   </View>
-                  <Text style={styles.heroTitle}>The Future of Exam Readiness Is Here</Text>
-                  <Text style={styles.typingText}>{readinessText}</Text>
-                  
-                  <TouchableOpacity 
-                    style={styles.challengeBtn} 
-                    onPress={() => {
-                      const randomIndex = Math.floor(Math.random() * subjectsConfig.length);
-                      openDifficultySelector(subjectsConfig[randomIndex].name);
-                    }}
-                  >
-                    {/* Indigo-Purple Gradient for button */}
-                    <LinearGradient colors={['#6366f1', '#a855f7']} start={{x:0, y:0}} end={{x:1, y:0}} style={styles.btnGradient}>
-                        <Text style={styles.challengeBtnText}>ACTIVATE CHALLENGE</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
+                )}
               </View>
 
-              {/* STATS TILES */}
+              <TouchableOpacity 
+                style={styles.mainActivateBtn} 
+                onPress={() => {
+                  const randomIndex = Math.floor(Math.random() * subjectsConfig.length);
+                  openDifficultySelector(subjectsConfig[randomIndex].name);
+                }}
+              >
+                <LinearGradient colors={['#a855f7', '#6366f1']} start={{x:0, y:0}} end={{x:1, y:0}} style={styles.activateGradient}>
+                    <Text style={styles.activateBtnText}>ACTIVATE</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              {/* Stats Row */}
               <View style={styles.statsRow}>
                   <TouchableOpacity style={styles.glassTile} onPress={() => navigation.navigate("Leaderboard")}>
-                      <Text style={[styles.tileLabel, {color: '#a855f7'}]}>TOP PERFORMERS</Text>
+                      <View style={styles.tileHeader}>
+                        <View style={styles.leaderboardIconContainer}>
+                            <Text style={styles.tileIcon}>🏆</Text>
+                        </View>
+                        <Text style={[styles.tileLabel, {color: '#a855f7'}]}>GLOBAL RANKING</Text>
+                      </View>
                       <Text style={styles.tileValue}>LEADERBOARD</Text>
+                      <View style={styles.miniProgress}><View style={[styles.miniFill, {width: '100%', backgroundColor:'#a855f7'}]} /></View>
                   </TouchableOpacity>
+
                   <TouchableOpacity style={styles.glassTile} onPress={() => navigation.navigate("Analytics")}>
-                      <Text style={[styles.tileLabel, {color: '#6366f1'}]}>SYSTEM ANALYTICS</Text>
-                      <Text style={styles.tileValue}>REAL-TIME LOGS</Text>
+                      <View style={styles.tileHeader}>
+                         <Text style={styles.tileIcon}>🕒</Text>
+                         <Text style={[styles.tileLabel, {color: '#00d2ff'}]}>REAL-TIME LOGS</Text>
+                      </View>
+                      <Text style={styles.tileValue}>PERFORMANCE</Text>
+                      <View style={styles.miniProgress}><View style={[styles.miniFill, {width: '40%', backgroundColor:'#00d2ff'}]} /></View>
                   </TouchableOpacity>
               </View>
 
-              {/* SUBJECTS GRID */}
               <Text style={styles.sectionTitle}>SELECT MODULE TO COMMENCE</Text>
               <View style={styles.moduleGrid}>
                 {subjectsConfig.map((s, i) => (
-                  <TouchableOpacity key={i} style={styles.glassModule} onPress={() => openDifficultySelector(s.name)}>
+                  <TouchableOpacity key={i} style={[styles.glassModule, isWeb && { width: '31%' }]} onPress={() => openDifficultySelector(s.name)}>
                     <View style={[styles.iconBox, { backgroundColor: s.color + '15', borderColor: s.color + '40' }]}>
                       <Text style={{ color: s.color, fontWeight: '900', fontSize: 16 }}>{s.icon}</Text>
                     </View>
@@ -390,80 +407,81 @@ export default function HomeScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#020617" },
+  bgOrb: { position: 'absolute', width: 300, height: 300, borderRadius: 150, opacity: 0.5, filter: Platform.OS === 'web' ? 'blur(80px)' : undefined },
   loadingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(2, 6, 23, 0.98)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 },
   loadingText: { marginTop: 20, fontSize: 11, fontWeight: '900', letterSpacing: 2 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 25, paddingBottom: 15, paddingTop: Platform.OS === 'android' ? 45 : 10 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 25, paddingVertical: 15, width: '100%', alignSelf: 'center', maxWidth: 1200 },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 15 },
-  
-  dashboardAvatar: { width: 50, height: 50, borderRadius: 25, borderWidth: 1.5, borderColor: '#6366f1', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
-  dashboardAvatarText: { color: '#6366f1', fontSize: 20, fontWeight: '900' },
-  onlineDot: { position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: 6, backgroundColor: '#10b981', borderWidth: 2, borderColor: '#020617' },
-  
-  avatarCircleLarge: { width: 90, height: 90, borderRadius: 45, borderWidth: 2, borderColor: '#6366f1', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
-  avatarCircleExtraLarge: { width: 120, height: 120, borderRadius: 60, borderWidth: 3, borderColor: '#6366f1', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', backgroundColor: '#0f172a' },
-  avatarLetterExtraLarge: { color: '#fff', fontSize: 50, fontWeight: '900' },
-  mainAvatarContainerLarge: { alignItems: 'center', marginVertical: 20 },
-  editBadgeLarge: { position: 'absolute', bottom: -5, backgroundColor: '#6366f1', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-
-  modalContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { width: '90%', maxWidth: 400, backgroundColor: '#0f172a', padding: 25, borderRadius: 30, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', alignItems: 'center' },
-  modalHeader: { alignItems: 'center', marginBottom: 20, width: '100%' },
-  modalTitle: { color: '#a855f7', fontSize: 10, fontWeight: '900', letterSpacing: 3 },
-  titleDivider: { width: 40, height: 2, backgroundColor: '#6366f1', marginVertical: 10 },
-  modalSub: { color: '#fff', fontSize: 22, fontWeight: '900' },
-  
-  settingsGroup: { width: '100%' },
-  settingLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '900', marginVertical: 15, letterSpacing: 1 },
-  inputWrapper: { width: '100%', marginBottom: 12 },
-  inputLabel: { color: '#6366f1', fontSize: 9, fontWeight: '900', marginBottom: 5 },
-  profileInput: { width: '100%', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 12, color: '#fff', fontSize: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-  
-  modalFooterActions: { flexDirection: 'row', gap: 10, marginTop: 20, width: '100%' },
-  saveBtn: { flex: 1.5, backgroundColor: '#6366f1', paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
-  cancelBtn: { flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', paddingVertical: 14, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-  actionBtnText: { color: '#fff', fontSize: 11, fontWeight: '900' },
-
-  levelGroup: { width: '100%', gap: 12 },
-  levelBtn: { width: '100%', flexDirection: 'row', padding: 20, borderRadius: 18, alignItems: 'center', borderWidth: 1.5 },
-  statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 15 },
-  levelBtnText: { fontWeight: '900', fontSize: 14, letterSpacing: 1 },
-  
-  nodeText: { color: "rgba(255,255,255,0.5)", fontSize: 8, fontWeight: "900", letterSpacing: 1.5 },
-  title: { color: "#fff", fontSize: 24, fontWeight: "900" },
-  exitBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: 'rgba(239, 68, 68, 0.1)', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)' },
-  exitText: { color: "#ef4444", fontSize: 10, fontWeight: "900" },
-  
-  mainWrapper: { width: '100%', maxWidth: 500, paddingHorizontal: 20 },
-  heroCard: { backgroundColor: 'rgba(255, 255, 255, 0.03)', padding: 25, borderRadius: 32, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)' },
-  heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  heroLabel: { color: "#6366f1", fontSize: 9, fontWeight: "900", letterSpacing: 2 },
-  heroTitle: { color: '#fff', fontSize: 26, fontWeight: '900', marginTop: 15, lineHeight: 32 },
-  insightBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(99, 102, 241, 0.1)', borderWidth: 1, borderColor: 'rgba(99, 102, 241, 0.3)' },
-  insightBtnText: { color: '#6366f1', fontSize: 9, fontWeight: '900' },
-  typingText: { color: "rgba(255,255,255,0.4)", fontSize: 12, lineHeight: 18, marginVertical: 20, height: 55, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
-  
-  challengeBtn: { width: '100%', height: 50, borderRadius: 15, overflow: 'hidden', marginTop: 10 },
-  btnGradient: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  challengeBtnText: { color: "#fff", fontSize: 13, fontWeight: "900", letterSpacing: 1 },
-  
-  statsRow: { flexDirection: 'row', gap: 12, marginBottom: 25 },
-  glassTile: { flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.03)', padding: 20, borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)' },
-  tileLabel: { fontSize: 8, fontWeight: '900', marginBottom: 5 },
-  tileValue: { color: '#fff', fontSize: 14, fontWeight: '900' },
-  
-  sectionTitle: { color: "rgba(255,255,255,0.3)", fontSize: 10, fontWeight: "900", letterSpacing: 1.5, marginBottom: 15, textAlign: 'center' },
+  dashboardAvatar: { width: 45, height: 45, borderRadius: 12, borderWidth: 1.5, borderColor: '#00d2ff', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  dashboardAvatarText: { color: '#00d2ff', fontSize: 18, fontWeight: '900' },
+  onlineDot: { position: 'absolute', bottom: -2, right: -2, width: 12, height: 12, borderRadius: 6, backgroundColor: '#10b981', borderWidth: 2, borderColor: '#020617' },
+  heroGlassContainer: { backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: 30, padding: 30, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)', marginBottom: -25, zIndex: 1, overflow: 'hidden' },
+  heroTextContent: { flex: 1.5 },
+  heroVisualContent: { flex: 1, justifyContent: 'center', alignItems: 'flex-end' }, // Inilipat sa dulo (right)
+  visualBrainContainer: { width: '100%', height: 180, justifyContent: 'center', alignItems: 'center' }, // Mas malaki at center sa flex space
+  visualIconBrain: { 
+    width: '100%', 
+    height: '100%', 
+    borderRadius: 20,
+    shadowColor: '#00d2ff',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 20,
+  },
+  heroLabel: { color: "#00d2ff", fontSize: 10, fontWeight: "900", letterSpacing: 2, marginBottom: 10 },
+  heroTitle: { color: '#fff', fontSize: 28, fontWeight: '900', lineHeight: 34 },
+  typingText: { color: "rgba(255,255,255,0.5)", fontSize: 13, lineHeight: 20, marginVertical: 15, minHeight: 60 },
+  insightBtnHero: { alignSelf: 'flex-start', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', marginTop: 5 },
+  insightBtnTextHero: { color: '#fff', fontSize: 11, fontWeight: '900' },
+  mainActivateBtn: { width: 240, height: 55, alignSelf: 'center', zIndex: 10, borderRadius: 18, overflow: 'hidden', shadowColor: '#a855f7', shadowRadius: 15, shadowOpacity: 0.5 },
+  activateGradient: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  activateBtnText: { color: '#fff', fontWeight: '900', letterSpacing: 2, fontSize: 16 },
+  statsRow: { flexDirection: 'row', gap: 15, marginTop: 40, marginBottom: 30, justifyContent: 'center' },
+  glassTile: { flex: 1, maxWidth: '48%', backgroundColor: 'rgba(255, 255, 255, 0.03)', padding: 15, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)' },
+  tileHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  leaderboardIconContainer: { padding: 4, backgroundColor: 'rgba(168, 85, 247, 0.1)', borderRadius: 8 },
+  tileIcon: { fontSize: 16 },
+  tileLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1 },
+  tileValue: { color: '#fff', fontSize: 13, fontWeight: '900', marginBottom: 10 },
+  miniProgress: { height: 3, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 2 },
+  miniFill: { height: '100%', borderRadius: 2 },
+  sectionTitle: { color: "rgba(255,255,255,0.3)", fontSize: 10, fontWeight: "900", letterSpacing: 1.5, marginBottom: 20, textAlign: 'center' },
   moduleGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  glassModule: { width: '48%', backgroundColor: 'rgba(255, 255, 255, 0.02)', padding: 20, borderRadius: 25, marginBottom: 15, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.06)' },
-  iconBox: { width: 42, height: 42, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginBottom: 15, borderWidth: 1 },
+  glassModule: { width: '48%', backgroundColor: 'rgba(255, 255, 255, 0.02)', padding: 20, borderRadius: 25, marginBottom: 15, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.05)' },
+  iconBox: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 15, borderWidth: 1 },
   moduleName: { color: '#fff', fontSize: 12, fontWeight: "900", marginBottom: 12 },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   barBg: { flex: 1, height: 4, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 2 },
   barFill: { height: '100%', borderRadius: 2 },
   pctText: { fontSize: 10, fontWeight: '900' },
-  scrollPadding: { paddingVertical: 20, alignItems: 'center' },
-  presetItemLarge: { width: 55, height: 55, borderRadius: 27.5, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(99, 102, 241, 0.3)' },
-  presetImg: { width: '100%', height: '100%' },
-  editBadgeText: { color: '#fff', fontSize: 8, fontWeight: '900' },
-  abortBtn: { marginTop: 15 },
-  abortText: { color: '#ef4444', fontSize: 10, fontWeight: '900', letterSpacing: 1 }
+  modalContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { width: '90%', backgroundColor: '#0f172a', padding: 25, borderRadius: 30, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  modalHeader: { alignItems: 'center', marginBottom: 20 },
+  modalTitle: { color: '#00d2ff', fontSize: 10, fontWeight: '900', letterSpacing: 3 },
+  titleDivider: { width: 40, height: 2, backgroundColor: '#a855f7', marginTop: 8 },
+  modalSub: { color: '#fff', fontSize: 22, fontWeight: '900', marginTop: 10 },
+  profileInput: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: 12, color: '#fff', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', marginBottom: 10 },
+  inputLabel: { color: '#00d2ff', fontSize: 9, fontWeight: '900', marginBottom: 5 },
+  saveBtn: { flex: 1.5, backgroundColor: '#00d2ff', paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  cancelBtn: { flex: 1, paddingVertical: 14, alignItems: 'center' },
+  actionBtnText: { color: '#fff', fontSize: 11, fontWeight: '900' },
+  nodeText: { color: "rgba(255,255,255,0.4)", fontSize: 8, fontWeight: "900", letterSpacing: 1.5 },
+  title: { color: "#fff", fontSize: 22, fontWeight: "900" },
+  exitBtn: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.05)' },
+  exitText: { color: "#ef4444", fontSize: 10, fontWeight: "900" },
+  scrollPadding: { paddingBottom: 50 },
+  mainWrapper: { width: '100%', paddingHorizontal: 20, alignSelf: 'center' },
+  avatarCircleExtraLarge: { width: 100, height: 100, borderRadius: 50, borderWidth: 2, borderColor: '#00d2ff' },
+  avatarCircleLarge: { width: 80, height: 80, borderRadius: 40, borderWidth: 2, borderColor: '#00d2ff' },
+  avatarLetterLarge: { color: '#fff', fontSize: 30, fontWeight: '900' },
+  mainAvatarContainerLarge: { alignItems: 'center', marginBottom: 20 },
+  editBadgeLarge: { backgroundColor: '#00d2ff', padding: 5, borderRadius: 5, marginTop: -10 },
+  editBadgeText: { color: '#000', fontSize: 8, fontWeight: '900' },
+  levelBtn: { flexDirection: 'row', alignItems: 'center', padding: 18, borderRadius: 15, marginBottom: 10, borderWidth: 1 },
+  levelBtnText: { fontWeight: '900', letterSpacing: 1 },
+  statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 12 },
+  abortBtn: { marginTop: 15, alignSelf: 'center' },
+  abortText: { color: '#ef4444', fontSize: 11, fontWeight: '900' },
+  presetItemLarge: { width: 50, height: 50, borderRadius: 25, overflow: 'hidden', marginRight: 10 },
+  presetImg: { width: '100%', height: '100%' }
 });

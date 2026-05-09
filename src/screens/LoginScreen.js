@@ -8,25 +8,28 @@ import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
-  Dimensions,
   Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View
 } from "react-native";
 import { loginUser } from "../utils/auth";
 
 WebBrowser.maybeCompleteAuthSession();
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
 export default function LoginScreen({ navigation }) {
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
+  const isWeb = Platform.OS === 'web';
+  const isLargeScreen = SCREEN_WIDTH > 800;
+
   const [email, setEmail] = useState(""); 
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -35,7 +38,6 @@ export default function LoginScreen({ navigation }) {
   const [resetModal, setResetModal] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [isHovered, setIsHovered] = useState(false);
 
   const rotateX = useRef(new Animated.Value(0)).current;
   const rotateY = useRef(new Animated.Value(0)).current;
@@ -43,7 +45,7 @@ export default function LoginScreen({ navigation }) {
   // --- GOOGLE & FB PROVIDERS ---
   const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
     webClientId: "945221804729-nl9lkf2k2j4cqqq80chgq65vleffu75a.apps.googleusercontent.com",
-    redirectUri: "http://localhost:8081",
+    redirectUri: isWeb ? "http://localhost:8081" : undefined,
     extraParams: { prompt: 'select_account' },
   });
 
@@ -51,14 +53,13 @@ export default function LoginScreen({ navigation }) {
     clientId: "1707248143792703", 
     responseType: ResponseType.Token,
     scopes: ['public_profile', 'email'],
-    redirectUri: "http://localhost:8081/",
+    redirectUri: isWeb ? "http://localhost:8081/" : undefined,
   });
 
   const handleNavigationToHome = () => {
     navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
   };
 
-  // --- FACEBOOK AUTH REDIRECT FIX ---
   useEffect(() => {
     if (fbResponse?.type === 'success') {
       const { access_token } = fbResponse.params;
@@ -69,15 +70,12 @@ export default function LoginScreen({ navigation }) {
           const userData = { fullName: user.name, email: user.email || user.id, id: user.id };
           await AsyncStorage.setItem('current_user', JSON.stringify(userData));
           handleNavigationToHome();
-        } catch (e) {
-          handleNavigationToHome();
-        }
+        } catch (e) { handleNavigationToHome(); }
       };
       fetchFBUser();
     }
   }, [fbResponse]);
 
-  // --- GOOGLE AUTH REDIRECT ---
   useEffect(() => {
     if (googleResponse?.type === 'success') {
       const { authentication } = googleResponse;
@@ -96,7 +94,6 @@ export default function LoginScreen({ navigation }) {
     }
   }, [googleResponse]);
 
-  // --- LOGIN LOGIC ---
   const handleLogin = async () => {
     setEmailError("");
     setPasswordError("");
@@ -147,7 +144,7 @@ export default function LoginScreen({ navigation }) {
   };
 
   useEffect(() => {
-    if (Platform.OS === 'web') {
+    if (isWeb) {
       const handleMouseMove = (event) => {
         const tiltX = (event.clientY - SCREEN_HEIGHT / 2) / 30;
         const turnY = (event.clientX - SCREEN_WIDTH / 2) / 20;
@@ -157,10 +154,14 @@ export default function LoginScreen({ navigation }) {
       window.addEventListener('mousemove', handleMouseMove);
       return () => window.removeEventListener('mousemove', handleMouseMove);
     }
-  }, []);
+  }, [SCREEN_HEIGHT, SCREEN_WIDTH]);
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView 
+      style={{ flex: 1 }} 
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+    >
       <StatusBar barStyle="light-content" />
       <View style={styles.mainContainer}>
         
@@ -178,99 +179,123 @@ export default function LoginScreen({ navigation }) {
           </View>
         </Modal>
 
-        <View style={styles.contentCard}>
-          <View style={styles.formSection}>
-            <View style={styles.authCard}>
-              <View style={styles.statusBadge}><Text style={styles.badgeText}>USER ACCESS</Text></View>
-              <Text style={styles.mainTitle}>EXAM<Text style={{color: '#a855f7'}}>READINESS</Text></Text>
-              <Text style={styles.subText}>Train your mind, success will follow.</Text>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContainer} 
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          <View style={[styles.contentCard, !isLargeScreen && styles.mobileCard]}>
+            <View style={styles.formSection}>
+              <View style={styles.authCard}>
+                <View style={styles.statusBadge}><Text style={styles.badgeText}>USER ACCESS</Text></View>
+                <Text style={styles.mainTitle}>EXAM<Text style={{color: '#a855f7'}}>READINESS</Text></Text>
+                <Text style={styles.subText}>Train your mind, success will follow.</Text>
 
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Email or Phone</Text>
-                <TextInput 
-                  placeholder="@hcdc.edu.ph / Contact No." 
-                  onChangeText={(text) => { setEmail(text); setEmailError(""); }} 
-                  style={[styles.fieldInput, emailError ? styles.errorBorder : null]} 
-                  placeholderTextColor="#94a3b8"
-                  returnKeyType="next"
-                />
-                {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
-              </View>
-
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Password</Text>
-                <View style={[styles.passInputWrapper, passwordError ? styles.errorBorder : null]}>
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>Email or Phone</Text>
                   <TextInput 
-                      placeholder="••••••••••••••••" 
-                      secureTextEntry={!showPassword} 
-                      onChangeText={(text) => { setPassword(text); setPasswordError(""); }} 
-                      style={styles.passInput} 
-                      placeholderTextColor="#94a3b8" 
-                      returnKeyType="done"
-                      onSubmitEditing={handleLogin}
+                    placeholder="@hcdc.edu.ph / Contact No." 
+                    onChangeText={(text) => { setEmail(text); setEmailError(""); }} 
+                    style={[styles.fieldInput, emailError ? styles.errorBorder : null]} 
+                    placeholderTextColor="#94a3b8"
+                    returnKeyType="next"
+                    autoCapitalize="none"
                   />
-                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.iconPadding}>
-                    <Ionicons name={showPassword ? "eye-off" : "eye"} size={18} color="#a855f7" />
+                  {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
+                </View>
+
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>Password</Text>
+                  <View style={[styles.passInputWrapper, passwordError ? styles.errorBorder : null]}>
+                    <TextInput 
+                        placeholder="••••••••••••••••" 
+                        secureTextEntry={!showPassword} 
+                        onChangeText={(text) => { setPassword(text); setPasswordError(""); }} 
+                        style={styles.passInput} 
+                        placeholderTextColor="#94a3b8" 
+                        returnKeyType="done"
+                        onSubmitEditing={handleLogin}
+                    />
+                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.iconPadding}>
+                      <Ionicons name={showPassword ? "eye-off" : "eye"} size={18} color="#a855f7" />
+                    </TouchableOpacity>
+                  </View>
+                  {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
+                </View>
+
+                <TouchableOpacity onPress={() => setResetModal(true)} style={styles.forgotBtn}>
+                  <Text style={styles.forgotText}>Forgot Password?</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.executeBtn} onPress={handleLogin}>
+                    <Text style={styles.btnText}>LOG IN NOW</Text>
+                </TouchableOpacity>
+
+                <View style={styles.dividerRow}>
+                  <View style={styles.dividerLine} /><Text style={styles.orText}>OR</Text><View style={styles.dividerLine} />
+                </View>
+
+                <View style={styles.socialRow}>
+                  <TouchableOpacity onPress={() => googlePromptAsync()} style={styles.socialBox}>
+                    <Ionicons name="logo-google" size={20} color="#ea4335" />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => fbPromptAsync()} style={styles.socialBox}>
+                    <FontAwesome name="facebook" size={20} color="#1877f2" />
                   </TouchableOpacity>
                 </View>
-                {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
-              </View>
 
-              <TouchableOpacity onPress={() => setResetModal(true)} style={styles.forgotBtn}>
-                <Text style={styles.forgotText}>Forgot Password?</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.executeBtn} onPress={handleLogin}>
-                  <Text style={styles.btnText}>LOG IN NOW</Text>
-              </TouchableOpacity>
-
-              <View style={styles.dividerRow}>
-                <View style={styles.dividerLine} /><Text style={styles.orText}>OR</Text><View style={styles.dividerLine} />
-              </View>
-
-              <View style={styles.socialRow}>
-                <TouchableOpacity onPress={() => googlePromptAsync()} style={styles.socialBox}>
-                  <Ionicons name="logo-google" size={20} color="#ea4335" />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => fbPromptAsync()} style={styles.socialBox}>
-                  <FontAwesome name="facebook" size={20} color="#1877f2" />
+                <TouchableOpacity 
+                    onPress={() => navigation.navigate("SignUp")} 
+                    style={styles.bottomLink}
+                >
+                  <Text style={styles.linkText}>New user? <Text style={styles.linkHighlight}>Create Account</Text></Text>
                 </TouchableOpacity>
               </View>
-
-              <TouchableOpacity 
-                  onPress={() => navigation.navigate("SignUp")} 
-                  style={styles.bottomLink}
-              >
-                <Text style={styles.linkText}>New user? <Text style={styles.linkHighlight}>Create Account</Text></Text>
-              </TouchableOpacity>
             </View>
+
+            {isLargeScreen && (
+              <View style={styles.visualSection}>
+                <View style={styles.glow1} />
+                <Animated.View style={{
+                  transform: [
+                    { perspective: 1000 },
+                    { rotateX: isWeb ? rotateX.interpolate({ inputRange: [-20, 20], outputRange: ['-20deg', '20deg'] }) : '0deg' },
+                    { rotateY: isWeb ? rotateY.interpolate({ inputRange: [-30, 30], outputRange: ['-30deg', '30deg'] }) : '0deg' },
+                  ],
+                }}>
+                  <Image source={require("../assets/ai-student.png")} style={styles.visualImg} />
+                </Animated.View>
+                <View style={styles.floatingInfo}><Text style={styles.infoText}>LOGIN NODE: SECURE</Text></View>
+              </View>
+            )}
           </View>
-
-          {(Platform.OS === 'web' || SCREEN_WIDTH > 800) && (
-            <View style={styles.visualSection}>
-              <View style={styles.glow1} />
-              <Animated.View style={{
-                transform: [
-                  { perspective: 1000 },
-                  { rotateX: Platform.OS === 'web' ? rotateX.interpolate({ inputRange: [-20, 20], outputRange: ['-20deg', '20deg'] }) : '0deg' },
-                  { rotateY: Platform.OS === 'web' ? rotateY.interpolate({ inputRange: [-30, 30], outputRange: ['-30deg', '30deg'] }) : '0deg' },
-                ],
-              }}>
-                <Image source={require("../assets/ai-student.png")} style={styles.visualImg} />
-              </Animated.View>
-              <View style={styles.floatingInfo}><Text style={styles.infoText}>LOGIN NODE: SECURE</Text></View>
-            </View>
-          )}
-        </View>
+        </ScrollView>
       </View>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  mainContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  contentCard: { flexDirection: 'row', width: '100%', maxWidth: 1000, height: 650, backgroundColor: '#020617', borderRadius: 30, borderWidth: 1, borderColor: 'rgba(168, 85, 247, 0.2)', overflow: 'hidden', shadowColor: "#a855f7", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 30, elevation: 10 },
-  formSection: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+  mainContainer: { flex: 1, backgroundColor: '#000' },
+  scrollContainer: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  contentCard: { 
+    flexDirection: 'row', 
+    width: '100%', 
+    maxWidth: 1000, 
+    minHeight: 650, 
+    backgroundColor: '#020617', 
+    borderRadius: 30, 
+    borderWidth: 1, 
+    borderColor: 'rgba(168, 85, 247, 0.2)', 
+    overflow: 'hidden', 
+    shadowColor: "#a855f7", 
+    shadowOffset: { width: 0, height: 10 }, 
+    shadowOpacity: 0.1, 
+    shadowRadius: 30, 
+    elevation: 10 
+  },
+  mobileCard: { flexDirection: 'column', height: 'auto', paddingVertical: 20 },
+  formSection: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 40 },
   authCard: { width: '100%', maxWidth: 350 },
   statusBadge: { backgroundColor: 'rgba(168, 85, 247, 0.1)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 4, alignSelf: 'flex-start', borderWidth: 1, borderColor: 'rgba(168, 85, 247, 0.3)', marginBottom: 15 },
   badgeText: { color: '#a855f7', fontSize: 9, fontWeight: '800', letterSpacing: 1 },
@@ -278,9 +303,9 @@ const styles = StyleSheet.create({
   subText: { color: '#475569', fontSize: 13, marginTop: 5, marginBottom: 30 },
   fieldGroup: { marginBottom: 15 },
   fieldLabel: { color: '#a855f7', fontSize: 10, fontWeight: '700', marginBottom: 8, textTransform: 'uppercase' },
-  fieldInput: { backgroundColor: '#eff6ff', height: 50, borderRadius: 12, paddingHorizontal: 15, color: '#1e293b', fontSize: 14 },
+  fieldInput: { backgroundColor: '#eff6ff', height: 50, borderRadius: 12, paddingHorizontal: 15, color: '#1e293b', fontSize: 14, ...Platform.select({ web: { outlineStyle: 'none' } }) },
   passInputWrapper: { flexDirection: 'row', backgroundColor: '#eff6ff', borderRadius: 12, alignItems: 'center' },
-  passInput: { flex: 1, height: 50, paddingHorizontal: 15, color: '#1e293b' },
+  passInput: { flex: 1, height: 50, paddingHorizontal: 15, color: '#1e293b', ...Platform.select({ web: { outlineStyle: 'none' } }) },
   iconPadding: { paddingRight: 15 },
   forgotBtn: { alignSelf: 'flex-end', marginTop: -5, marginBottom: 15 },
   forgotText: { color: '#a855f7', fontSize: 11, fontWeight: '800' },

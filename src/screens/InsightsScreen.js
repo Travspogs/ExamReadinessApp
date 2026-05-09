@@ -1,12 +1,22 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Dimensions, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View
+} from "react-native";
 import { StorageService } from "../utils/storageService";
-
-const { width } = Dimensions.get("window");
 
 export default function InsightsScreen({ navigation }) {
   const [analysisText, setAnalysisText] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(true);
+  const { width: SCREEN_WIDTH } = useWindowDimensions();
+  const isWeb = Platform.OS === 'web';
   
   const [stats, setStats] = useState({
     strength: "NONE",
@@ -20,7 +30,6 @@ export default function InsightsScreen({ navigation }) {
     try {
       const logs = await StorageService.getResults(); 
       
-      // 1. HARD CHECK KUNG EMPTY ANG LOGS PARA HINDI MAG-DEFAULT SA MATH
       if (!logs || logs.length === 0) {
         setStats({
             strength: "NONE",
@@ -32,7 +41,6 @@ export default function InsightsScreen({ navigation }) {
         return "Initial Data Insufficient. Please complete more challenges to generate a neural profile. System requires at least one completed session to begin analysis.";
       }
 
-      // 2. Group by subject
       const grouped = logs.reduce((acc, log) => {
         const subName = log.subject || "Unknown";
         acc[subName] = acc[subName] || { totalScore: 0, count: 0 };
@@ -47,12 +55,10 @@ export default function InsightsScreen({ navigation }) {
         tries: data.count
       }));
 
-      // 3. FIND BEST AND WORST
       const sorted = [...modules].sort((a, b) => b.avg - a.avg);
       const best = sorted[0];
       const worst = sorted[sorted.length - 1];
       
-      // 4. COMPUTE TOTALS
       const totalAccuracy = Math.round(logs.reduce((acc, curr) => acc + curr.score, 0) / logs.length);
       const totalAttempts = logs.length;
 
@@ -73,37 +79,41 @@ export default function InsightsScreen({ navigation }) {
   };
 
   useEffect(() => {
+    let interval;
     const startAnalysis = async () => {
       const report = await loadAndAnalyze();
       
-      const scanTimer = setTimeout(() => {
+      // Artificial delay para sa scanning feel
+      setTimeout(() => {
         setIsAnalyzing(false);
         
         let index = 0;
-        const interval = setInterval(() => {
+        interval = setInterval(() => {
           setAnalysisText(report.slice(0, index));
           index++;
           if (index > report.length) clearInterval(interval);
-        }, 30);
-        return () => clearInterval(interval);
+        }, 25);
       }, 1500);
     };
 
     startAnalysis();
+    return () => clearInterval(interval);
   }, []);
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollPadding}>
-        
-        <View style={styles.mainWrapper}>
+      <ScrollView 
+        showsVerticalScrollIndicator={isWeb} 
+        contentContainerStyle={styles.scrollPadding}
+      >
+        <View style={[styles.mainWrapper, isWeb && { maxWidth: 600 }]}>
           
           <View style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.goBack()}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backWrapper}>
               <Text style={styles.backBtn}>◄ BACK</Text>
             </TouchableOpacity>
-            <Text style={styles.title}>MY<Text style={{color: '#6366f1'}}>INSIGHTS</Text></Text>
-            <View style={{width: 50}} /> 
+            <Text style={styles.title}>MY <Text style={{color: '#6366f1'}}>INSIGHTS</Text></Text>
+            <View style={{width: 60}} /> 
           </View>
 
           <View style={styles.featuredCard}>
@@ -143,7 +153,6 @@ export default function InsightsScreen({ navigation }) {
           </View>
           
         </View>
-
       </ScrollView>
     </SafeAreaView>
   );
@@ -159,24 +168,56 @@ const StatCard = ({ label, value, color }) => (
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#02040d" },
   scrollPadding: { paddingVertical: 24, alignItems: 'center' },
-  mainWrapper: { width: '100%', maxWidth: 450, paddingHorizontal: 20 },
-  header: { flexDirection: "row", justifyContent: "space-between", marginBottom: 30, alignItems: "center" },
+  mainWrapper: { width: '100%', paddingHorizontal: 20 },
+  header: { 
+    flexDirection: "row", 
+    justifyContent: "space-between", 
+    marginBottom: 30, 
+    alignItems: "center",
+    width: '100%'
+  },
+  backWrapper: { paddingVertical: 10 },
   backBtn: { color: "#6366f1", fontWeight: "900", fontSize: 12, letterSpacing: 1 },
   title: { color: "#fff", fontSize: 20, fontWeight: "900", letterSpacing: 1 },
-  featuredCard: { backgroundColor: "#0b0c14", padding: 24, borderRadius: 24, marginBottom: 25, borderWidth: 1, borderColor: "rgba(99, 102, 241, 0.2)" },
+  featuredCard: { 
+    backgroundColor: "#0b0c14", 
+    padding: 24, 
+    borderRadius: 24, 
+    marginBottom: 25, 
+    borderWidth: 1, 
+    borderColor: "rgba(99, 102, 241, 0.2)",
+    ...Platform.select({
+      web: { boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }
+    })
+  },
   featuredHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   featuredLabel: { color: "#6366f1", fontSize: 9, fontWeight: "900", letterSpacing: 2 },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
   typingContainer: { minHeight: 120 },
-  typingText: { color: "#94a3b8", fontSize: 13, lineHeight: 22, fontWeight: "500", fontFamily: 'monospace' },
+  typingText: { 
+    color: "#94a3b8", 
+    fontSize: 13, 
+    lineHeight: 22, 
+    fontWeight: "500", 
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' 
+  },
   cursor: { color: '#6366f1', fontWeight: 'bold' },
-  loadingBox: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 10 },
+  loadingBox: { flex: 1, height: 120, justifyContent: 'center', alignItems: 'center', gap: 10 },
   loadingText: { color: "#6366f1", fontSize: 9, fontWeight: "800", letterSpacing: 1 },
   featuredActions: { marginTop: 20, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', paddingTop: 20 },
   actionBtn: { backgroundColor: 'rgba(99, 102, 241, 0.1)', paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
   actionBtnText: { color: '#6366f1', fontWeight: '900', fontSize: 10, letterSpacing: 1 },
   grid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: 12 },
-  card: { width: "48%", padding: 18, borderRadius: 16, backgroundColor: "#0b0c14", borderWidth: 1, borderColor: "rgba(255,255,255,0.05)", borderLeftWidth: 4 },
+  card: { 
+    width: "48%", 
+    padding: 18, 
+    borderRadius: 16, 
+    backgroundColor: "#0b0c14", 
+    borderWidth: 1, 
+    borderColor: "rgba(255,255,255,0.05)", 
+    borderLeftWidth: 4,
+    marginBottom: 5
+  },
   cardLabel: { color: "#475569", fontSize: 8, fontWeight: "900", marginBottom: 5, letterSpacing: 0.5 },
   cardValue: { color: "#fff", fontSize: 14, fontWeight: "800" }
 });
