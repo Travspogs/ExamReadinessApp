@@ -22,8 +22,9 @@ import {
 } from "react-native";
 import { StorageService } from "../utils/storageService";
 
-// ASSETS
-const BRAIN_ICON = require('../assets/assets/brain_bg.jpg'); 
+// IMPORT YOUR ASSETS HERE
+const BRAIN_ICON = require('../assets/assets/brain_bg.jpg'); // Your blue brain image
+const RANK_ICON = require('../assets/assets/avatar1.png'); // Placeholder for rank icon if needed
 
 export default function HomeScreen({ navigation }) {
   const { width: windowWidth } = useWindowDimensions();
@@ -324,9 +325,9 @@ export default function HomeScreen({ navigation }) {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollPadding}>
           <View style={[styles.mainWrapper, isWeb && { maxWidth: 1000 }]}>
               
-              {/* Hero Section */}
-              <View style={[styles.heroGlassContainer, isLargeScreen && { flexDirection: 'row', alignItems: 'center' }]}>
-                <View style={[styles.heroTextContent, isLargeScreen && { flex: 1 }]}>
+              {/* Hero Section with Local Brain Image */}
+              <View style={[styles.heroGlassContainer, isLargeScreen && { flexDirection: 'row' }]}>
+                <View style={[styles.heroTextContent, isLargeScreen && { flex: 1.2 }]}>
                     <Text style={styles.heroLabel}>CORE PROTOCOL</Text>
                     <Text style={styles.heroTitle}>The Future of Exam Readiness Is Here</Text>
                     <Text style={styles.typingText}>{readinessText}</Text>
@@ -339,8 +340,9 @@ export default function HomeScreen({ navigation }) {
                 {isLargeScreen && (
                   <View style={styles.heroVisualContent}>
                      <View style={styles.visualBrainContainer}>
-                        {/* UPDATE: Full-sized brain icon, square overlay removed */}
+                        {/* UPDATE: Use local brain asset with glow effect */}
                         <Image source={BRAIN_ICON} style={styles.visualIconBrain} resizeMode="contain" />
+                       
                      </View>
                   </View>
                 )}
@@ -358,26 +360,27 @@ export default function HomeScreen({ navigation }) {
                 </LinearGradient>
               </TouchableOpacity>
 
-              {/* Stats Row */}
+              {/* Stats / Leaderboard Row */}
               <View style={styles.statsRow}>
                   <TouchableOpacity style={styles.glassTile} onPress={() => navigation.navigate("Leaderboard")}>
                       <View style={styles.tileHeader}>
+                        {/* UPDATE: Styled Leaderboard Icon */}
                         <View style={styles.leaderboardIconContainer}>
-                            <Text style={styles.tileIcon}>🏆</Text>
+                           <Text style={styles.tileIcon}>🏆</Text>
                         </View>
                         <Text style={[styles.tileLabel, {color: '#a855f7'}]}>GLOBAL RANKING</Text>
                       </View>
                       <Text style={styles.tileValue}>LEADERBOARD</Text>
-                      <View style={styles.miniProgress}><View style={[styles.miniFill, {width: '100%', backgroundColor:'#a855f7'}]} /></View>
+                      
                   </TouchableOpacity>
 
                   <TouchableOpacity style={styles.glassTile} onPress={() => navigation.navigate("Analytics")}>
                       <View style={styles.tileHeader}>
                          <Text style={styles.tileIcon}>🕒</Text>
-                         <Text style={[styles.tileLabel, {color: '#00d2ff'}]}>REAL-TIME LOGS</Text>
+                         <Text style={[styles.tileLabel, {color: '#00d2ff'}]}>REAL TIME LOGS</Text>
                       </View>
                       <Text style={styles.tileValue}>PERFORMANCE</Text>
-                      <View style={styles.miniProgress}><View style={[styles.miniFill, {width: '40%', backgroundColor:'#00d2ff'}]} /></View>
+                      
                   </TouchableOpacity>
               </View>
 
@@ -406,82 +409,520 @@ export default function HomeScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#020617" },
-  bgOrb: { position: 'absolute', width: 300, height: 300, borderRadius: 150, opacity: 0.5, filter: Platform.OS === 'web' ? 'blur(80px)' : undefined },
-  loadingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(2, 6, 23, 0.98)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 },
-  loadingText: { marginTop: 20, fontSize: 11, fontWeight: '900', letterSpacing: 2 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 25, paddingVertical: 15, width: '100%', alignSelf: 'center', maxWidth: 1200 },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 15 },
-  dashboardAvatar: { width: 45, height: 45, borderRadius: 12, borderWidth: 1.5, borderColor: '#00d2ff', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
-  dashboardAvatarText: { color: '#00d2ff', fontSize: 18, fontWeight: '900' },
-  onlineDot: { position: 'absolute', bottom: -2, right: -2, width: 12, height: 12, borderRadius: 6, backgroundColor: '#10b981', borderWidth: 2, borderColor: '#020617' },
-  heroGlassContainer: { backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: 30, padding: 30, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)', marginBottom: -25, zIndex: 1, overflow: 'hidden' },
-  heroTextContent: { flex: 1.5 },
-  heroVisualContent: { flex: 1, justifyContent: 'center', alignItems: 'flex-end' }, // Inilipat sa dulo (right)
-  visualBrainContainer: { width: '100%', height: 180, justifyContent: 'center', alignItems: 'center' }, // Mas malaki at center sa flex space
+  container: { 
+    flex: 1, 
+    backgroundColor: "#020617" 
+  },
+
+  bgOrb: { 
+    position: 'absolute',
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    opacity: 0.5,
+    filter: Platform.OS === 'web' ? 'blur(80px)' : undefined
+  },
+
+  loadingOverlay: { 
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(2, 6, 23, 0.98)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999
+  },
+
+  loadingText: { 
+    marginTop: 20,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 2
+  },
+
+  header: { 
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 25,
+    paddingVertical: 18,
+    width: '100%',
+    alignSelf: 'center',
+    maxWidth: 1200
+  },
+
+  headerLeft: { 
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 15
+  },
+
+  dashboardAvatar: { 
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#00d2ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.03)'
+  },
+
+  dashboardAvatarText: { 
+    color: '#00d2ff',
+    fontSize: 18,
+    fontWeight: '900'
+  },
+
+  onlineDot: { 
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#10b981',
+    borderWidth: 2,
+    borderColor: '#020617'
+  },
+
+  heroGlassContainer: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 32,
+    padding: 30,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    marginBottom: -25,
+    zIndex: 1,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 8
+  },
+
+  heroTextContent: { 
+    flex: 1,
+    justifyContent: 'center'
+  },
+
+  heroVisualContent: { 
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+
+  visualBrainContainer: {
+    width: 180,
+    height: 180,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+
   visualIconBrain: { 
-    width: '100%', 
-    height: '100%', 
-    borderRadius: 20,
+    width: '100%',
+    height: '100%',
+    borderRadius: 28,
+
     shadowColor: '#00d2ff',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 20,
+    shadowOpacity: 1,
+    shadowRadius: 25,
+
+    elevation: 20
   },
-  heroLabel: { color: "#00d2ff", fontSize: 10, fontWeight: "900", letterSpacing: 2, marginBottom: 10 },
-  heroTitle: { color: '#fff', fontSize: 28, fontWeight: '900', lineHeight: 34 },
-  typingText: { color: "rgba(255,255,255,0.5)", fontSize: 13, lineHeight: 20, marginVertical: 15, minHeight: 60 },
-  insightBtnHero: { alignSelf: 'flex-start', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', marginTop: 5 },
-  insightBtnTextHero: { color: '#fff', fontSize: 11, fontWeight: '900' },
-  mainActivateBtn: { width: 240, height: 55, alignSelf: 'center', zIndex: 10, borderRadius: 18, overflow: 'hidden', shadowColor: '#a855f7', shadowRadius: 15, shadowOpacity: 0.5 },
-  activateGradient: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  activateBtnText: { color: '#fff', fontWeight: '900', letterSpacing: 2, fontSize: 16 },
-  statsRow: { flexDirection: 'row', gap: 15, marginTop: 40, marginBottom: 30, justifyContent: 'center' },
-  glassTile: { flex: 1, maxWidth: '48%', backgroundColor: 'rgba(255, 255, 255, 0.03)', padding: 15, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)' },
-  tileHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
-  leaderboardIconContainer: { padding: 4, backgroundColor: 'rgba(168, 85, 247, 0.1)', borderRadius: 8 },
-  tileIcon: { fontSize: 16 },
-  tileLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1 },
-  tileValue: { color: '#fff', fontSize: 13, fontWeight: '900', marginBottom: 10 },
-  miniProgress: { height: 3, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 2 },
-  miniFill: { height: '100%', borderRadius: 2 },
-  sectionTitle: { color: "rgba(255,255,255,0.3)", fontSize: 10, fontWeight: "900", letterSpacing: 1.5, marginBottom: 20, textAlign: 'center' },
-  moduleGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  glassModule: { width: '48%', backgroundColor: 'rgba(255, 255, 255, 0.02)', padding: 20, borderRadius: 25, marginBottom: 15, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.05)' },
-  iconBox: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 15, borderWidth: 1 },
-  moduleName: { color: '#fff', fontSize: 12, fontWeight: "900", marginBottom: 12 },
-  progressRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  barBg: { flex: 1, height: 4, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 2 },
-  barFill: { height: '100%', borderRadius: 2 },
-  pctText: { fontSize: 10, fontWeight: '900' },
-  modalContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { width: '90%', backgroundColor: '#0f172a', padding: 25, borderRadius: 30, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-  modalHeader: { alignItems: 'center', marginBottom: 20 },
-  modalTitle: { color: '#00d2ff', fontSize: 10, fontWeight: '900', letterSpacing: 3 },
-  titleDivider: { width: 40, height: 2, backgroundColor: '#a855f7', marginTop: 8 },
-  modalSub: { color: '#fff', fontSize: 22, fontWeight: '900', marginTop: 10 },
-  profileInput: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: 12, color: '#fff', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', marginBottom: 10 },
-  inputLabel: { color: '#00d2ff', fontSize: 9, fontWeight: '900', marginBottom: 5 },
-  saveBtn: { flex: 1.5, backgroundColor: '#00d2ff', paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
-  cancelBtn: { flex: 1, paddingVertical: 14, alignItems: 'center' },
-  actionBtnText: { color: '#fff', fontSize: 11, fontWeight: '900' },
-  nodeText: { color: "rgba(255,255,255,0.4)", fontSize: 8, fontWeight: "900", letterSpacing: 1.5 },
-  title: { color: "#fff", fontSize: 22, fontWeight: "900" },
-  exitBtn: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.05)' },
-  exitText: { color: "#ef4444", fontSize: 10, fontWeight: "900" },
-  scrollPadding: { paddingBottom: 50 },
-  mainWrapper: { width: '100%', paddingHorizontal: 20, alignSelf: 'center' },
-  avatarCircleExtraLarge: { width: 100, height: 100, borderRadius: 50, borderWidth: 2, borderColor: '#00d2ff' },
-  avatarCircleLarge: { width: 80, height: 80, borderRadius: 40, borderWidth: 2, borderColor: '#00d2ff' },
-  avatarLetterLarge: { color: '#fff', fontSize: 30, fontWeight: '900' },
-  mainAvatarContainerLarge: { alignItems: 'center', marginBottom: 20 },
-  editBadgeLarge: { backgroundColor: '#00d2ff', padding: 5, borderRadius: 5, marginTop: -10 },
-  editBadgeText: { color: '#000', fontSize: 8, fontWeight: '900' },
-  levelBtn: { flexDirection: 'row', alignItems: 'center', padding: 18, borderRadius: 15, marginBottom: 10, borderWidth: 1 },
-  levelBtnText: { fontWeight: '900', letterSpacing: 1 },
-  statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 12 },
-  abortBtn: { marginTop: 15, alignSelf: 'center' },
-  abortText: { color: '#ef4444', fontSize: 11, fontWeight: '900' },
-  presetItemLarge: { width: 50, height: 50, borderRadius: 25, overflow: 'hidden', marginRight: 10 },
-  presetImg: { width: '100%', height: '100%' }
+
+  heroLabel: { 
+    color: "#00d2ff",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 2,
+    marginBottom: 10
+  },
+
+  heroTitle: { 
+    color: '#fff',
+    fontSize: 30,
+    fontWeight: '900',
+    lineHeight: 38
+  },
+
+  typingText: { 
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 13,
+    lineHeight: 22,
+    marginVertical: 15,
+    minHeight: 60
+  },
+
+  insightBtnHero: { 
+    alignSelf: 'flex-start',
+    paddingHorizontal: 22,
+    paddingVertical: 13,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    marginTop: 5
+  },
+
+  insightBtnTextHero: { 
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1
+  },
+
+  mainActivateBtn: { 
+    width: 250,
+    height: 58,
+    alignSelf: 'center',
+    zIndex: 10,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#a855f7',
+    shadowRadius: 20,
+    shadowOpacity: 0.7,
+    elevation: 12
+  },
+
+  activateGradient: { 
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+
+  activateBtnText: { 
+    color: '#fff',
+    fontWeight: '900',
+    letterSpacing: 2,
+    fontSize: 16
+  },
+
+  statsRow: { 
+    flexDirection: 'row',
+    gap: 15,
+    marginTop: 40,
+    marginBottom: 30,
+    justifyContent: 'center'
+  },
+
+  glassTile: { 
+    flex: 1,
+    maxWidth: '48%',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    paddingVertical: 24,
+    paddingHorizontal: 18,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    justifyContent: 'center',
+
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 6
+  },
+
+  tileHeader: { 
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12
+  },
+
+  leaderboardIconContainer: { 
+    padding: 6,
+    backgroundColor: 'rgba(168, 85, 247, 0.12)',
+    borderRadius: 10
+  },
+
+  tileIcon: { 
+    fontSize: 16
+  },
+
+  tileLabel: { 
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 1.2
+  },
+
+  tileValue: { 
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '900',
+    marginTop: 8,
+    letterSpacing: 1
+  },
+
+  sectionTitle: { 
+    color: "rgba(255,255,255,0.3)",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1.5,
+    marginBottom: 20,
+    textAlign: 'center'
+  },
+
+  moduleGrid: { 
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between'
+  },
+
+  glassModule: { 
+    width: '48%',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    padding: 20,
+    borderRadius: 26,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 4
+  },
+
+  iconBox: { 
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 15,
+    borderWidth: 1
+  },
+
+  moduleName: { 
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: "900",
+    marginBottom: 14,
+    letterSpacing: 0.5
+  },
+
+  progressRow: { 
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+
+  barBg: { 
+    flex: 1,
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 2
+  },
+
+  barFill: { 
+    height: '100%',
+    borderRadius: 2
+  },
+
+  pctText: { 
+    fontSize: 10,
+    fontWeight: '900'
+  },
+
+  modalContainer: { 
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+
+  modalContent: { 
+    width: '90%',
+    backgroundColor: '#0f172a',
+    padding: 25,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)'
+  },
+
+  modalHeader: { 
+    alignItems: 'center',
+    marginBottom: 20
+  },
+
+  modalTitle: { 
+    color: '#00d2ff',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 3
+  },
+
+  titleDivider: { 
+    width: 40,
+    height: 2,
+    backgroundColor: '#a855f7',
+    marginTop: 8
+  },
+
+  modalSub: { 
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '900',
+    marginTop: 10
+  },
+
+  profileInput: { 
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 14,
+    padding: 14,
+    color: '#fff',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    marginBottom: 10
+  },
+
+  inputLabel: { 
+    color: '#00d2ff',
+    fontSize: 9,
+    fontWeight: '900',
+    marginBottom: 5
+  },
+
+  saveBtn: { 
+    flex: 1.5,
+    backgroundColor: '#00d2ff',
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center'
+  },
+
+  cancelBtn: { 
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center'
+  },
+
+  actionBtnText: { 
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '900'
+  },
+
+  nodeText: { 
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 8,
+    fontWeight: "900",
+    letterSpacing: 1.5
+  },
+
+  title: { 
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "900"
+  },
+
+  exitBtn: { 
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)'
+  },
+
+  exitText: { 
+    color: "#ef4444",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1
+  },
+
+  scrollPadding: { 
+    paddingBottom: 50
+  },
+
+  mainWrapper: { 
+    width: '100%',
+    paddingHorizontal: 20,
+    alignSelf: 'center'
+  },
+
+  avatarCircleExtraLarge: { 
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 2,
+    borderColor: '#00d2ff'
+  },
+
+  avatarCircleLarge: { 
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 2,
+    borderColor: '#00d2ff'
+  },
+
+  avatarLetterLarge: { 
+    color: '#fff',
+    fontSize: 30,
+    fontWeight: '900'
+  },
+
+  mainAvatarContainerLarge: { 
+    alignItems: 'center',
+    marginBottom: 20
+  },
+
+  editBadgeLarge: { 
+    backgroundColor: '#00d2ff',
+    padding: 5,
+    borderRadius: 5,
+    marginTop: -10
+  },
+
+  editBadgeText: { 
+    color: '#000',
+    fontSize: 8,
+    fontWeight: '900'
+  },
+
+  levelBtn: { 
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 18,
+    borderRadius: 16,
+    marginBottom: 10,
+    borderWidth: 1
+  },
+
+  levelBtnText: { 
+    fontWeight: '900',
+    letterSpacing: 1
+  },
+
+  statusDot: { 
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 12
+  },
+
+  abortBtn: { 
+    marginTop: 15,
+    alignSelf: 'center'
+  },
+
+  abortText: { 
+    color: '#ef4444',
+    fontSize: 11,
+    fontWeight: '900'
+  },
+
+  presetItemLarge: { 
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    overflow: 'hidden',
+    marginRight: 10
+  },
+
+  presetImg: { 
+    width: '100%',
+    height: '100%'
+  }
 });

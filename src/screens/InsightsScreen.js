@@ -38,7 +38,7 @@ export default function InsightsScreen({ navigation }) {
             totalTries: "0",
             rank: "UNRANKED"
         });
-        return "Initial Data Insufficient. Please complete more challenges to generate a neural profile. System requires at least one completed session to begin analysis.";
+        return "Initial Data Insufficient. Please complete more challenges to generate a neural profile.";
       }
 
       const grouped = logs.reduce((acc, log) => {
@@ -52,25 +52,29 @@ export default function InsightsScreen({ navigation }) {
       const modules = Object.entries(grouped).map(([name, data]) => ({
         name,
         avg: data.totalScore / data.count,
-        tries: data.count
+        tries: data.count,
+        // Weighted Score: Combination of high average and activity frequency
+        weightedScore: (data.totalScore / data.count) + (data.count * 0.5) 
       }));
 
-      const sorted = [...modules].sort((a, b) => b.avg - a.avg);
+      // Sort based on weighted score para mas dynamic ang results
+      const sorted = [...modules].sort((a, b) => b.weightedScore - a.weightedScore);
+      
       const best = sorted[0];
-      const worst = sorted[sorted.length - 1];
+      const worst = [...modules].sort((a, b) => a.avg - b.avg)[0];
       
       const totalAccuracy = Math.round(logs.reduce((acc, curr) => acc + curr.score, 0) / logs.length);
       const totalAttempts = logs.length;
 
       setStats({
         strength: best.name.toUpperCase(),
-        weakness: modules.length > 1 ? worst.name.toUpperCase() : "MORE DATA REQ.",
+        weakness: modules.length > 1 && worst.name !== best.name ? worst.name.toUpperCase() : "MORE DATA REQ.",
         accuracy: `${totalAccuracy}%`,
         totalTries: totalAttempts.toString(),
         rank: totalAccuracy >= 90 ? "GOLD" : totalAccuracy >= 75 ? "SILVER" : "BRONZE"
       });
 
-      return `Neural Analysis Complete: Your mastery in ${best.name} is your greatest asset with ${Math.round(best.avg)}% stability. Your total system engagement is at ${totalAttempts} missions. ${modules.length > 1 ? `Focus on ${worst.name} to stabilize your overall core score.` : "Complete more subjects to unlock full comparative analytics."}`;
+      return `Neural Analysis Complete: Your current dominance in ${best.name} shows high stability at ${Math.round(best.avg)}%. System engagement logged at ${totalAttempts} missions. ${modules.length > 1 ? `Recommendation: Focus on ${worst.name} to optimize overall performance.` : "Engage in more diverse subjects to unlock deeper analytics."}`;
 
     } catch (e) {
       console.log(e);
@@ -83,10 +87,8 @@ export default function InsightsScreen({ navigation }) {
     const startAnalysis = async () => {
       const report = await loadAndAnalyze();
       
-      // Artificial delay para sa scanning feel
       setTimeout(() => {
         setIsAnalyzing(false);
-        
         let index = 0;
         interval = setInterval(() => {
           setAnalysisText(report.slice(0, index));
@@ -169,13 +171,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#02040d" },
   scrollPadding: { paddingVertical: 24, alignItems: 'center' },
   mainWrapper: { width: '100%', paddingHorizontal: 20 },
-  header: { 
-    flexDirection: "row", 
-    justifyContent: "space-between", 
-    marginBottom: 30, 
-    alignItems: "center",
-    width: '100%'
-  },
+  header: { flexDirection: "row", justifyContent: "space-between", marginBottom: 30, alignItems: "center", width: '100%' },
   backWrapper: { paddingVertical: 10 },
   backBtn: { color: "#6366f1", fontWeight: "900", fontSize: 12, letterSpacing: 1 },
   title: { color: "#fff", fontSize: 20, fontWeight: "900", letterSpacing: 1 },
@@ -185,10 +181,7 @@ const styles = StyleSheet.create({
     borderRadius: 24, 
     marginBottom: 25, 
     borderWidth: 1, 
-    borderColor: "rgba(99, 102, 241, 0.2)",
-    ...Platform.select({
-      web: { boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }
-    })
+    borderColor: "rgba(99, 102, 241, 0.2)" 
   },
   featuredHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   featuredLabel: { color: "#6366f1", fontSize: 9, fontWeight: "900", letterSpacing: 2 },

@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { questions } from '../data/questions';
 
+
 export default function QuizScreen({ route, navigation }) {
   const { subject, difficulty } = route.params || {};
   const { width: SCREEN_WIDTH } = useWindowDimensions();
